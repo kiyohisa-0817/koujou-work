@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>工場ワークナビ</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <header>
+        <div class="logo" onclick="window.app.router('top')"><span class="logo-fw">工場ワーク</span>ナビ<span>.</span></div>
+        <div class="header-right" id="header-nav-area">
+            </div>
+    </header>
+
+    <div id="main-content" class="container">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div style="font-weight:bold; color:#666;">読み込み中...</div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">メッセージ</div>
+
+    <div id="region-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="modal-title">勤務地を選択</span>
+                <button class="modal-close" onclick="window.app.closeRegionModal()">×</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+
+</body>
+</html>
