@@ -755,6 +755,8 @@ const app = {
             <div class="detail-tabs">
                 <div class="detail-tab-item active" onclick="app.switchDetailTab('info')">募集要項</div>
                 <div class="detail-tab-item" onclick="app.switchDetailTab('feature')">特徴・選考</div>
+                <div class="detail-tab-item" onclick="app.switchDetailTab('company')">企業情報</div>
+                <div class="detail-tab-item" onclick="app.switchDetailTab('map')">地図・アクセス</div>
             </div>
 
             <div class="detail-padding">
@@ -800,6 +802,27 @@ const app = {
                     <div class="detail-section-title">福利厚生</div>
                     <div class="detail-text">${job.benefits || '-'}</div>
                 </div>
+
+                <div id="tab-company" class="tab-content hidden">
+                    <div class="detail-section-title">企業情報</div>
+                    <div class="info-grid">
+                         <div class="info-item"><div class="info-label">🏢 会社名</div><div class="info-value">${job.company}</div></div>
+                         <div class="info-item"><div class="info-label">🏭 業界</div><div class="info-value">${job.industry || '製造業'}</div></div>
+                         <div class="info-item"><div class="info-label">📄 事業内容</div><div class="info-value">自動車部品の製造・販売および輸出入</div></div>
+                         <div class="info-item"><div class="info-label">👥 従業員数</div><div class="info-value">1,200名</div></div>
+                    </div>
+                </div>
+
+                <div id="tab-map" class="tab-content hidden">
+                    <div class="detail-section-title">地図・アクセス</div>
+                    <div style="background:#eee; height:200px; margin:0 20px; display:flex; align-items:center; justify-content:center; border-radius:12px; font-weight:bold; color:#888;">
+                        MAP PLACEHOLDER
+                    </div>
+                    <div class="detail-text" style="margin-top:16px;">
+                        ${job.pref}の工場エリア<br>
+                        ※詳細は面接時にお伝えします。
+                    </div>
+                </div>
             </div>
 
             <div class="fixed-cta">
@@ -814,11 +837,17 @@ const app = {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
         
         if (tabName === 'info') {
-            document.querySelector('.detail-tab-item:nth-child(1)').classList.add('active');
+            document.querySelectorAll('.detail-tab-item')[0].classList.add('active');
             document.getElementById('tab-info').classList.remove('hidden');
-        } else {
-            document.querySelector('.detail-tab-item:nth-child(2)').classList.add('active');
+        } else if (tabName === 'feature') {
+            document.querySelectorAll('.detail-tab-item')[1].classList.add('active');
             document.getElementById('tab-feature').classList.remove('hidden');
+        } else if (tabName === 'company') {
+            document.querySelectorAll('.detail-tab-item')[2].classList.add('active');
+            document.getElementById('tab-company').classList.remove('hidden');
+        } else if (tabName === 'map') {
+            document.querySelectorAll('.detail-tab-item')[3].classList.add('active');
+            document.getElementById('tab-map').classList.remove('hidden');
         }
     },
 
