@@ -314,7 +314,6 @@ const app = {
         else if (pageName === 'terms') { container.innerHTML = ''; app.renderTerms(container); }
     },
 
-    // ★★★ Logo Fix: Text Changed ★★★
     renderHeader: () => {
         const area = document.getElementById('header-nav-area');
         const logo = document.querySelector('.logo');
@@ -328,11 +327,11 @@ const app = {
         if (app.state.user) {
             area.innerHTML = `<div class="header-btn-icon" onclick="app.router('mypage')"><span class="icon">👤</span>マイページ${badgeHtml}</div><div class="header-btn-icon" onclick="app.router('list')"><span class="icon">🔍</span>さがす</div>`;
         } else {
+            // Heart icon routes to mypage for guest keeps as well
             area.innerHTML = `<div class="header-btn-icon" onclick="app.router('mypage')"><span class="icon" style="color:#e91e63;">♥</span>キープ${badgeHtml}</div><span class="header-login-link" onclick="app.router('login')">ログイン</span><button class="btn-register-header" onclick="app.router('register')">無料会員登録</button>`;
         }
     },
 
-    // ★★★ Top Page Fix: Arrow Position ★★★
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
         target.innerHTML = `
@@ -348,11 +347,15 @@ const app = {
                 </div>
             </div>
             ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
+            
             <div class="section-title">職種から探す</div>
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
-            <div class="text-center mt-4"><button class="btn-more-link" onclick="app.router('list', {category: []})">職種をもっと見る</button></div>
+            <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
+            
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
+            <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">こだわりをもっと見る</button></div>
+            
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
             
@@ -366,7 +369,6 @@ const app = {
         `;
     },
 
-    // ★★★ Added Missing Function: createJobCard ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         return `
@@ -380,12 +382,15 @@ const app = {
                     <div class="job-info-row"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
                     <div class="job-info-row"><span>📍</span> ${job.pref} &nbsp; <span>🏭</span> ${getCategoryName(job.category)}</div>
                     <div style="margin-top:8px;">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                    <div class="job-card-actions">
+                        <button class="btn btn-outline btn-card" onclick="event.stopPropagation(); app.router('detail', ${job.id})">詳細</button>
+                        <button class="btn btn-accent btn-card" onclick="event.stopPropagation(); app.router('detail', ${job.id}); setTimeout(()=>app.router('form'), 100);">応募する</button>
+                    </div>
                 </div>
             </div>
         `;
     },
 
-    // ★★★ Added Missing Function: toggleKeep ★★★
     toggleKeep: async (id) => {
         const sid = String(id);
         if(app.state.user) {
@@ -408,10 +413,7 @@ const app = {
             localStorage.setItem('factory_work_navi_guest_keeps', JSON.stringify(app.state.guestKeeps));
             app.renderHeader();
             document.querySelectorAll(`.keep-btn-${id}`).forEach(b => b.classList.toggle('active'));
-            if(app.state.page === 'list') {
-                // Optional: refresh list to update view, but class toggle covers simple case
-            }
-            if(app.state.page === 'detail') app.renderDetail(document.getElementById('main-content'), app.state.detailId);
+            if(app.state.page === 'mypage') app.renderMypage(document.getElementById('main-content'));
         }
     },
 
@@ -460,7 +462,6 @@ const app = {
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
-    // ★★★ Detail Page Fix: Layout & Spec Table ★★★
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) return;
@@ -577,6 +578,61 @@ const app = {
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
+    renderMypage: (target) => {
+        if (!app.state.user) {
+            // Guest View (Keeps only)
+            const keepJobs = JOBS_DATA.filter(j => app.state.guestKeeps.includes(String(j.id)));
+            target.innerHTML = `
+                <div class="mypage-header">
+                    <h2 style="font-size:20px; font-weight:bold;">マイページ (ゲスト)</h2>
+                    <p style="font-size:12px; margin-top:8px;">ログインすると応募履歴も確認できます</p>
+                </div>
+                <div style="padding:0 16px;">
+                    <div class="mypage-tabs">
+                        <div class="mypage-tab active">キープ中 (${keepJobs.length})</div>
+                        <div class="mypage-tab" style="opacity:0.5;">応募履歴</div>
+                    </div>
+                    <div class="job-list">
+                        ${keepJobs.length ? keepJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">キープ中の求人はありません</p>'}
+                    </div>
+                </div>
+                <div class="container" style="padding:20px; text-align:center;">
+                    <button class="btn btn-primary" onclick="app.router('login')">ログインして機能を使う</button>
+                </div>
+            `;
+        } else {
+            // User View
+            const { userKeeps, user } = app.state;
+            const appliedIds = user.applied || [];
+            const isKeepTab = app.state.mypageTab === 'keep';
+            
+            const displayJobs = isKeepTab 
+                ? JOBS_DATA.filter(j => userKeeps.includes(String(j.id)))
+                : JOBS_DATA.filter(j => appliedIds.includes(String(j.id)));
+
+            target.innerHTML = `
+                <div class="mypage-header">
+                    <h2 style="font-size:20px; font-weight:bold;">${user.name} さんのマイページ</h2>
+                    <div style="margin-top:10px; font-size:12px; border:1px solid rgba(255,255,255,0.3); display:inline-block; padding:4px 10px; border-radius:15px; cursor:pointer;" onclick="app.logout()">ログアウト</div>
+                </div>
+                <div style="padding:0 16px;">
+                    <div class="mypage-tabs">
+                        <div class="mypage-tab ${isKeepTab?'active':''}" onclick="app.switchMypageTab('keep')">キープ中</div>
+                        <div class="mypage-tab ${!isKeepTab?'active':''}" onclick="app.switchMypageTab('history')">応募履歴</div>
+                    </div>
+                    <div class="job-list">
+                        ${displayJobs.length ? displayJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人はありません</p>'}
+                    </div>
+                </div>
+            `;
+        }
+    },
+
+    switchMypageTab: (tab) => {
+        app.state.mypageTab = tab;
+        app.renderMypage(document.getElementById('main-content'));
+    },
+
     renderAuthPage: (target, type) => {
         if(type === 'login') {
             target.innerHTML = `
@@ -654,7 +710,6 @@ const app = {
             tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
         }
         
-        // ★ 都道府県選択セクションの追加 (Modal内) ★
         const currentPref = app.state.page === 'list' ? app.state.filter.pref : '';
         const prefHtml = `
             <div class="cond-section">
@@ -685,7 +740,6 @@ const app = {
 
     updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.renderListItems(); },
     
-    // ★★★ Region Modal Fix ★★★
     openRegionModal: () => { 
         document.getElementById('region-modal').classList.add('active'); 
         app.renderRegionStep1(); 
