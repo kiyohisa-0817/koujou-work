@@ -115,7 +115,7 @@ const generateJobs = (count) => {
             type: i % 4 === 0 ? "期間工" : "派遣社員",
             isNew: i <= 25,
             desc: `${pref}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
-            flow: "8:00 朝礼 → 作業開始 → 12:00 休憩 → 17:00 終了",
+            flow: "8:00〜17:00 (実働8h)",
             holidays: "土日休み（会社カレンダーによる）",
             benefits: "社会保険完備、有給休暇、制服貸与",
             apply_flow: "応募フォームより応募 → 面接（WEB可） → 採用",
@@ -192,7 +192,7 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            if(app.state.page) app.router(app.state.page, app.state.detailId, false);
+            if(app.state.page) app.router(app.state.page, app.state.detailId);
         });
 
         // Initialize Modal HTML
@@ -227,27 +227,7 @@ const app = {
             }
         }
         document.getElementById('loading-overlay').style.display = 'none';
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlId = urlParams.get('id');
-        if (urlId) {
-            app.state.detailId = parseInt(urlId);
-            app.router('detail', app.state.detailId, false);
-        } else {
-            app.router(app.state.page || 'top', app.state.detailId, false);
-        }
-
-        window.addEventListener('popstate', (event) => {
-            const currentParams = new URLSearchParams(window.location.search);
-            const currentId = currentParams.get('id');
-            if (currentId) {
-                app.state.detailId = parseInt(currentId);
-                app.router('detail', app.state.detailId, false);
-            } else {
-                if (event.state && event.state.page) app.router(event.state.page, event.state.id, false);
-                else app.router('top', null, false);
-            }
-        });
+        app.router(app.state.page || 'top', app.state.detailId);
     },
 
     syncUserKeeps: (uid) => {
@@ -270,16 +250,14 @@ const app = {
 
     saveState: () => sessionStorage.setItem('fwn_state', JSON.stringify(app.state)),
 
-    router: (pageName, param = null, addHistory = true) => {
-        window.scrollTo(0, 0);
+    router: (pageName, param = null) => {
+        if (pageName === 'detail') window.scrollTo(0, 0);
+        else if (pageName === 'list' && param && param.fromTop) window.scrollTo(0, 0);
+        else if (pageName !== 'detail' && pageName !== app.state.page) window.scrollTo(0, 0);
+
         app.state.page = pageName;
         if(pageName === 'detail') app.state.detailId = param;
         app.saveState();
-
-        if (addHistory) {
-            const newUrl = (pageName === 'detail' && param) ? `${window.location.pathname}?id=${param}` : window.location.pathname;
-            window.history.pushState({page: pageName, id: param}, '', newUrl);
-        }
         
         const container = document.getElementById('main-content');
         if (pageName === 'top') { container.innerHTML = ''; app.renderTop(container); }
@@ -705,14 +683,11 @@ const app = {
         
         if(condModal && condModal.classList.contains('active')) {
             // 条件モーダルが開いている場合: 
-            // 1. 地域モーダルを閉じる
             app.closeRegionModal();
-            // 2. フィルタ状態を更新 (トップ/リスト問わず一時的に状態保持したいが、今回はfilterに直接セット)
             app.state.filter.pref = p;
-            // 3. 条件モーダルの中身を再描画して選択済み地域を表示更新
-            app.openConditionModal();
+            app.openConditionModal(); // 再描画
         } else {
-            // 通常時（トップやリスト画面から直接開かれた場合）
+            // 通常時
             app.state.filter.pref = p;
             app.closeRegionModal();
             
