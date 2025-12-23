@@ -227,9 +227,11 @@ header {
 }
 .checkbox-label input { margin-right: 8px; width: 16px; height: 16px; flex-shrink: 0; }
 
+/* ★★★ 変更箇所：ボタンが隠れないように余白を追加 ★★★ */
 .apply-btn-wrapper {
     position: sticky; bottom: 0; left: 0; right: 0; background: rgba(248, 249, 250, 0.95);
-    border-top: 1px solid #ddd; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid #ddd; 
+    padding: 16px 16px 40px; /* 下側の余白を増やしてスマホでのタップミス防止 */
     text-align: center; margin: 0 -20px -20px; z-index: 10; backdrop-filter: blur(5px);
 }
 
@@ -285,11 +287,9 @@ header {
 .tab-content { display: block; }
 .tab-content.hidden { display: none; }
 
-/* ★★★ 変更箇所：上マージンを詰める（20px -> 10px） ★★★ */
 .detail-summary-card { margin: 10px 20px 20px; padding: 20px; background: #f8fbfd; border-radius: 16px; border: 1px solid #e1e8ed; }
 
 .summary-row { display: flex; align-items: center; margin-bottom: 10px; }
-/* ★★★ 追加箇所：アイコンの横にスペースを入れる ★★★ */
 .summary-icon { margin-right: 10px; }
 .summary-val.highlight { color: #e53935; font-size: 18px; font-weight: bold; }
 .detail-section-title { font-size: 16px; font-weight: bold; margin: 30px 20px 15px; display: flex; align-items: center; color: var(--primary-color); }
