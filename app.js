@@ -38,7 +38,7 @@ const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 
 // ===============================================
-// Config: GAS URL & CSV URL
+// Config & Constants
 // ===============================================
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRdK1TXUJlZll4AbgNAoU33X3JiMJek8Z8ZpQhALxBCC3T7nfnN211M7TeS7tTfVW/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
@@ -77,12 +77,11 @@ const PREFS = REGIONS.flatMap(r => r.prefs);
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
-    let color = '#9C27B0', icon = '🏭';
-    if(['light','clean'].includes(catId)) { color = '#4CAF50'; icon = '📦'; }
-    else if(['assembly','metal','press','cast'].includes(catId)) { color = '#2196F3'; icon = '🔧'; }
-    else if(['logistics','fork','driver'].includes(catId)) { color = '#FF9800'; icon = '🚜'; }
-    else if(['operator','semicon','maintenance'].includes(catId)) { color = '#607D8B'; icon = '⚙️'; }
-    else if(['food'].includes(catId)) { color = '#E91E63'; icon = '🍱'; }
+    let color = '#0056b3', icon = '🏭';
+    if(['light','clean'].includes(catId)) { color = '#28a745'; icon = '📦'; }
+    else if(['assembly','metal','press'].includes(catId)) { color = '#0056b3'; icon = '🔧'; }
+    else if(['logistics','fork','driver'].includes(catId)) { color = '#ff9800'; icon = '🚜'; }
+    else if(['food'].includes(catId)) { color = '#e91e63'; icon = '🍱'; }
     const svg = `<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${color}" fill-opacity="0.1"/><text x="50%" y="55%" font-family="Arial" font-size="120" text-anchor="middle" dy=".3em">${icon}</text></svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 };
@@ -192,10 +191,10 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            if(app.state.page) app.router(app.state.page, app.state.detailId);
+            if(app.state.page) app.router(app.state.page, app.state.detailId, false);
         });
 
-        // ★★★ モーダル自動生成（不具合対策） ★★★
+        // Initialize Modal HTML
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="condition-modal" class="modal-overlay">
@@ -213,6 +212,7 @@ const app = {
                 </div>
             `);
         }
+        // 地域選択モーダルの自動補完
         if(!document.getElementById('region-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="region-modal" class="modal-overlay">
@@ -227,9 +227,7 @@ const app = {
             `);
         }
 
-        app.renderHeader();
-
-        // Data Loading
+        // Load Data
         if (GOOGLE_SHEET_CSV_URL) {
             try {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
@@ -242,7 +240,27 @@ const app = {
             }
         }
         document.getElementById('loading-overlay').style.display = 'none';
-        app.router(app.state.page || 'top', app.state.detailId);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlId = urlParams.get('id');
+        if (urlId) {
+            app.state.detailId = parseInt(urlId);
+            app.router('detail', app.state.detailId, false);
+        } else {
+            app.router(app.state.page || 'top', app.state.detailId, false);
+        }
+
+        window.addEventListener('popstate', (event) => {
+            const currentParams = new URLSearchParams(window.location.search);
+            const currentId = currentParams.get('id');
+            if (currentId) {
+                app.state.detailId = parseInt(currentId);
+                app.router('detail', app.state.detailId, false);
+            } else {
+                if (event.state && event.state.page) app.router(event.state.page, event.state.id, false);
+                else app.router('top', null, false);
+            }
+        });
     },
 
     syncUserKeeps: (uid) => {
@@ -265,11 +283,16 @@ const app = {
 
     saveState: () => sessionStorage.setItem('fwn_state', JSON.stringify(app.state)),
 
-    router: (pageName, param = null) => {
+    router: (pageName, param = null, addHistory = true) => {
         window.scrollTo(0, 0);
         app.state.page = pageName;
         if(pageName === 'detail') app.state.detailId = param;
         app.saveState();
+
+        if (addHistory) {
+            const newUrl = (pageName === 'detail' && param) ? `${window.location.pathname}?id=${param}` : window.location.pathname;
+            window.history.pushState({page: pageName, id: param}, '', newUrl);
+        }
         
         const container = document.getElementById('main-content');
         if (pageName === 'top') { container.innerHTML = ''; app.renderTop(container); }
@@ -286,8 +309,11 @@ const app = {
         else if (pageName === 'register' || pageName === 'login') { container.innerHTML = ''; app.renderAuthPage(container, pageName); }
         else if (pageName === 'form') { container.innerHTML = ''; app.renderForm(container); }
         else if (pageName === 'mypage') { container.innerHTML = ''; app.renderMypage(container); }
+        else if (pageName === 'privacy') { container.innerHTML = ''; app.renderPrivacy(container); }
+        else if (pageName === 'terms') { container.innerHTML = ''; app.renderTerms(container); }
     },
 
+    // ★★★ Logo Change & Header ★★★
     renderHeader: () => {
         const area = document.getElementById('header-nav-area');
         const logo = document.querySelector('.logo');
@@ -295,6 +321,7 @@ const app = {
             logo.onclick = () => app.router('top');
             logo.innerHTML = `<span class="logo-fw">工場ワーク</span><span class="logo-navi">NAVi</span><span class="logo-dot">.</span>`;
         }
+        
         const keepCount = app.state.user ? app.state.userKeeps.length : app.state.guestKeeps.length;
         const badgeHtml = keepCount > 0 ? `<span class="header-badge">${keepCount}</span>` : '';
         if (app.state.user) {
@@ -304,33 +331,73 @@ const app = {
         }
     },
 
-    // ★★★ Top Page: Restored Design (Blue Gradient) ★★★
+    // ★★★ Top Page: Restored Modern Design ★★★
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
         target.innerHTML = `
-            <div class="hero">
-                <h1>工場・製造業の求人なら<br>工場ワークNAVi</h1>
-                <p>全国からあなたにぴったりの職場を見つけよう！</p>
-                <div class="search-box">
-                    <div class="search-input-area">
-                        <button class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
-                        <button class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()">職種・こだわり条件を選択<span>▼</span></button>
+            <div class="hero-modern">
+                <div class="hero-bg-decoration"></div>
+                <h1 class="hero-title">工場・製造業の<br><span>理想の求人</span>が見つかる</h1>
+                <p class="hero-sub">高収入・寮完備・未経験OKなど豊富な案件数</p>
+                <div class="search-card">
+                    <div class="search-row">
+                        <button class="search-input-dummy" id="top-pref-display" onclick="app.openRegionModal()">
+                            <span>📍 勤務地を選択</span> <span style="color:var(--primary-color)">▼</span>
+                        </button>
+                        <button class="search-input-dummy" id="top-condition-btn" onclick="app.openConditionModal()">
+                            <span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>
+                        </button>
                     </div>
-                    <button class="btn-search" onclick="app.handleTopSearch()">検索</button>
+                    <button class="btn btn-primary" style="margin-top:12px; box-shadow:none; width:100%;" onclick="app.handleTopSearch()">検索する</button>
                 </div>
             </div>
-            ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
-            <div class="section-title">職種から探す</div>
-            <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
-            <div class="text-center mt-4"><button class="btn-more-link" onclick="app.router('list', {category: []})">職種をもっと見る</button></div>
-            <div style="clear:both;"></div>
-            <div class="section-title">人気のこだわり</div>
-            <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
-            <div class="text-center mt-4"><button class="btn-more-link" onclick="app.router('list', {tag: []})">こだわりをもっと見る</button></div>
-            <div style="clear:both;"></div>
-            <div class="section-title">新着求人</div>
-            <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
-            <div class="text-center mt-4 mb-4"><button class="btn btn-outline" style="width:90%" onclick="app.router('list', {clear: true})">すべての求人を見る</button></div>
+
+            <div class="section-head">
+                <div class="section-title">職種から探す</div>
+                <div class="section-more" onclick="app.router('list', {category: []})">すべて見る ></div>
+            </div>
+            <div class="category-scroll">
+                ${TOP_CATEGORIES.map(c => `
+                    <div class="cat-card" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})">
+                        <div class="cat-icon">${c.icon}</div>
+                        <div class="cat-name">${c.name}</div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="section-head">
+                <div class="section-title">人気のこだわり</div>
+            </div>
+            <div style="padding:0 20px; display:flex; flex-wrap:wrap; gap:8px;">
+                ${TAG_GROUPS["給与・特典"].slice(0, 6).map(t => `<span class="tag-pill" onclick="app.router('list', {fromTop: true, tag: ['${t}']})">${t}</span>`).join('')}
+            </div>
+
+            <div class="section-head" style="margin-top:10px;">
+                <div class="section-title">新着の求人</div>
+            </div>
+            <div class="job-list">
+                ${newJobs.map(job => app.createJobCard(job)).join('')}
+            </div>
+            
+            <div class="text-center mt-4 mb-4" style="padding:20px;">
+                <button class="btn btn-outline" style="width:100%;" onclick="app.router('list', {category: []})">すべての求人を見る</button>
+            </div>
+
+            ${!app.state.user ? `
+            <div style="margin:20px; padding:24px; background:linear-gradient(135deg, #1f2937 0%, #111827 100%); border-radius:24px; color:white; text-align:center; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+                <div style="font-size:18px; font-weight:bold; margin-bottom:8px;">会員登録で便利に！</div>
+                <p style="font-size:12px; opacity:0.8; margin-bottom:16px;">キープ機能や応募履歴の保存が可能になります。</p>
+                <button class="btn btn-register w-full" onclick="app.router('register')">無料で会員登録する</button>
+            </div>
+            ` : ''}
+
+            <div style="padding:40px 20px; text-align:center; font-size:11px; color:#9ca3af;">
+                <div style="display:flex; justify-content:center; gap:20px; margin-bottom:12px;">
+                    <span onclick="app.router('terms')">利用規約</span>
+                    <span onclick="app.router('privacy')">プライバシーポリシー</span>
+                </div>
+                &copy; 工場ワーク NAVi
+            </div>
         `;
     },
 
@@ -339,7 +406,7 @@ const app = {
         const pref = prefText.includes('勤務地') ? '' : prefText.replace('📍 ', '').replace(' ▼','').replace('変更する >','').trim();
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
-        app.router('list', { fromTop: true, pref: pref === '勤務地を選択' ? '' : pref, category, tag });
+        app.router('list', { fromTop: true, pref, category, tag });
     },
 
     renderList: (target) => {
@@ -387,8 +454,12 @@ const app = {
             <div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep(${job.id})">♥</div>
             <img src="${getJobImage(job)}" class="job-card-img">
             <div class="job-card-body">
+                <div class="job-tags">
+                    ${job.isNew ? '<span class="tag-mini new">NEW</span>' : ''}
+                    ${isApplied ? '<span class="tag-mini applied">応募済</span>' : ''}
+                    ${job.tags.slice(0,3).map(t=>`<span class="tag-mini">${t}</span>`).join('')}
+                </div>
                 <div class="job-card-title">${job.title}</div>
-                <div class="mb-2">${job.isNew?'<span class="tag new">NEW</span>':''}${isApplied?'<span class="tag applied">応募済み</span>':''}${job.tags.slice(0,4).map(t=>`<span class="tag">${t}</span>`).join('')}</div>
                 <div class="job-info-row">📍 ${job.pref}</div>
                 <div class="job-info-row">💴 <span class="salary-text">${job.salary}</span></div>
             </div>
@@ -411,7 +482,7 @@ const app = {
                 <img src="${getJobImage(job)}" class="detail-img-full">
             </div>
             <div class="detail-header">
-                <div class="detail-tags">${job.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+                <div class="detail-tags">${job.tags.map(t=>`<span class="tag-mini">${t}</span>`).join('')}</div>
                 <div class="detail-company">${job.company}</div>
                 <div class="detail-title">${job.title}</div>
             </div>
@@ -473,6 +544,7 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
+    // ★★★ Form with Validation ★★★
     renderForm: (target) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(app.state.detailId));
         target.innerHTML = `
@@ -515,6 +587,7 @@ const app = {
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
+    // ★★★ Registration with Validation ★★★
     renderAuthPage: (target, type) => {
         if(type === 'login') {
             target.innerHTML = `
@@ -556,6 +629,7 @@ const app = {
         app.register(app.getRegisterData());
     },
 
+    // --- Other Functions ---
     removeFilter: (type, val) => {
         if (type === 'pref') app.state.filter.pref = '';
         else if (type === 'category') {
@@ -568,7 +642,7 @@ const app = {
             const el = document.querySelector(`input[name="tag"][value="${val}"]`);
             if(el) el.checked = false;
         }
-        app.renderList(document.getElementById('main-content'));
+        app.renderList(document.getElementById('main-content')); // Reload list
     },
 
     updateModalChips: () => {
@@ -592,7 +666,7 @@ const app = {
             tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
         }
         
-        // ★ 都道府県選択セクションの追加 ★
+        // ★ 都道府県選択セクションの追加 (Modal内) ★
         const currentPref = app.state.page === 'list' ? app.state.filter.pref : '';
         const prefHtml = `
             <div class="cond-section">
@@ -642,14 +716,19 @@ const app = {
     },
     
     selectPref: (p) => {
+        // 詳細条件モーダルが開いているかチェック
         const condModal = document.getElementById('condition-modal');
+        
         if(condModal && condModal.classList.contains('active')) {
+            // 条件モーダルが開いている場合: 
             app.closeRegionModal();
             app.state.filter.pref = p;
-            app.openConditionModal();
+            app.openConditionModal(); // 再描画
         } else {
+            // 通常時
             app.state.filter.pref = p;
             app.closeRegionModal();
+            
             if (app.state.page === 'top') {
                 const display = document.getElementById('top-pref-display');
                 if(display) display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
