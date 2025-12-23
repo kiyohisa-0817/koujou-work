@@ -14,12 +14,6 @@
     --header-height: 60px;
 }
 
-@keyframes pulse {
-    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
-    70% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-}
-
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
 body {
@@ -71,12 +65,11 @@ header {
 
 .header-login-link { font-size: 12px; color: var(--text-sub); font-weight: bold; padding: 8px; cursor: pointer; }
 
-/* 【修正】会員登録の文字崩れ修正 */
 .btn-register-header {
     background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; 
     font-size: 11px; font-weight: bold;
     padding: 8px 12px; border-radius: 20px; border: none;
-    box-shadow: 0 3px 6px rgba(40,167,69,0.3); animation: pulse 3s infinite; white-space: nowrap;
+    box-shadow: 0 3px 6px rgba(40,167,69,0.3); white-space: nowrap;
 }
 
 .container { max-width: 600px; margin: 0 auto; padding-bottom: 80px; }
@@ -114,7 +107,7 @@ header {
 .font-bold { font-weight: bold; }
 .w-full { width: 100%; }
 
-/* Top Page (Design Preserved) */
+/* Top Page (Blue Gradient Design) */
 .hero {
     background-image: radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 25%), linear-gradient(135deg, #0056b3 0%, #003d80 100%);
     color: white; padding: 30px 16px 40px; text-align: center; border-radius: 0 0 30px 30px;
@@ -129,14 +122,13 @@ header {
 }
 .search-input-area { width: 100%; display: flex; flex-direction: column; gap: 8px; }
 
-/* 【修正】矢印位置修正（Flexboxで左右配置） */
 .search-input-btn {
     width: 100%; padding: 10px 12px; border: 2px solid #f0f0f0; border-radius: 8px;
     background: #f9f9f9; color: #333; text-align: left; cursor: pointer;
     font-weight: bold; font-size: 14px; appearance: none;
     display: flex; align-items: center; justify-content: space-between; 
 }
-.search-input-btn span { font-size: 14px; } /* 文字サイズ確保 */
+.search-input-btn span { font-size: 14px; }
 .search-input-btn::after { content: '▼'; color: #999; font-size: 10px; }
 
 .btn-search {
@@ -174,15 +166,14 @@ header {
 .btn-more-link:active { background: #f0f0f0; }
 .btn-more-link::after { content: ' >'; }
 
-/* List Page Header Fix */
-/* 【修正】求人検索ヘッダーの高さと位置 */
+/* List Page & Sticky */
 .page-header-simple {
     display: flex; align-items: center; justify-content: center;
     padding: 0 16px; background: #fff; border-bottom: 1px solid #eee;
     position: sticky; top: calc(var(--header-height) + env(safe-area-inset-top)); z-index: 800;
-    height: 50px; /* 高さを指定 */
+    height: 50px;
 }
-.page-header-title { flex: 1; text-align: center; font-weight: 800; font-size: 16px; margin-right: 44px; /* Backボタン分の余白 */ }
+.page-header-title { flex: 1; text-align: center; font-weight: 800; font-size: 16px; margin-right: 44px; }
 
 .sticky-search-header {
     position: sticky; top: calc(var(--header-height) + env(safe-area-inset-top) + 50px); z-index: 900;
@@ -229,7 +220,6 @@ header {
     text-align: center; margin: 0 -16px -20px; z-index: 10; backdrop-filter: blur(5px);
 }
 
-/* 【修正】検索結果件数のはみ出し防止 */
 .sort-area {
     display: flex; justify-content: space-between; align-items: baseline; 
     padding: 12px 16px; border-top: 1px solid #eee;
@@ -264,15 +254,13 @@ header {
 .job-info-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 14px; color: var(--text-sub); }
 .salary-text { color: var(--error-color); font-weight: 900; font-size: 18px; }
 
-/* 【修正】カード内ボタンサイズ */
 .card-actions { display: flex; gap: 12px; padding: 0 16px 20px; }
 .card-actions .btn { flex: 1; padding: 12px 0; font-size: 14px; height: 44px; }
 
-/* Detail Page - Layout Fix */
-/* 【修正】詳細画面の崩れ修正 */
+/* Detail Page */
 .detail-padding { padding-bottom: 100px; background: #fff; }
 .detail-img-full { width: 100%; height: 260px; object-fit: cover; }
-.detail-header { padding: 24px 20px 10px; background: #fff; border-radius: 24px 24px 0 0; margin-top: -24px; position: relative; border-bottom: 1px solid #f0f0f0; }
+.detail-header { padding: 24px 20px 10px; background: #fff; border-radius: 24px 24px 0 0; margin-top: -20px; position: relative; border-bottom: 1px solid #f0f0f0; }
 .detail-company { font-size: 13px; color: var(--text-sub); font-weight: bold; margin-bottom: 8px; }
 .detail-title { font-size: 22px; font-weight: 900; color: var(--text-main); line-height: 1.4; margin-bottom: 16px; }
 .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -321,9 +309,8 @@ header {
 .summary-icon { margin-right: 10px; font-size: 18px; width: 24px; text-align: center; }
 .summary-val.highlight { color: var(--error-color); font-size: 20px; font-weight: 900; }
 
-/* 【修正】詳細・応募ボタンを大きく */
 .fixed-cta {
-    position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.98);
+    position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(255,255,255,0.95);
     padding: 16px 20px; padding-bottom: calc(16px + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 20px rgba(0,0,0,0.1); backdrop-filter: blur(5px);
     display: flex; gap: 12px; z-index: 1000; border-top: 1px solid #eee;
@@ -342,12 +329,13 @@ header {
 
 /* Modal */
 .modal-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000;
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6);
+    z-index: 2000;
     display: none; align-items: center; justify-content: center;
 }
 .modal-overlay.active { display: flex; }
 
-/* 【修正】地域選択モーダルを詳細モーダルより上に表示 */
+/* 【修正】地域選択モーダルを詳細モーダルより手前に */
 #region-modal { z-index: 2200; }
 
 .modal-content {
