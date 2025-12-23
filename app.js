@@ -114,7 +114,7 @@ const generateJobs = (count) => {
             type: i % 4 === 0 ? "期間工" : "派遣社員",
             isNew: i <= 25,
             desc: `${pref}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
-            flow: "8:00〜17:00 (実働8h)",
+            flow: "8:00 朝礼 → 作業開始 → 12:00 休憩 → 17:00 終了",
             holidays: "土日休み（会社カレンダーによる）",
             benefits: "社会保険完備、有給休暇、制服貸与",
             apply_flow: "応募フォームより応募 → 面接（WEB可） → 採用",
@@ -332,7 +332,7 @@ const app = {
         }
     },
 
-    // ★★★ Top Page Fix: Arrow Position ★★★
+    // ★★★ Top Page: Restored Design (Blue Gradient) & Arrow Fix ★★★
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
         target.innerHTML = `
@@ -341,8 +341,8 @@ const app = {
                 <p>全国からあなたにぴったりの職場を見つけよう！</p>
                 <div class="search-box">
                     <div class="search-input-area">
-                        <button class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
-                        <button class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()">職種・こだわり条件を選択<span>▼</span></button>
+                        <button class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()"><span>勤務地を選択</span><span>▼</span></button>
+                        <button class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()"><span>職種・こだわり条件を選択</span><span>▼</span></button>
                     </div>
                     <button class="btn-search" onclick="app.handleTopSearch()">検索</button>
                 </div>
@@ -351,17 +351,20 @@ const app = {
             <div class="section-title">職種から探す</div>
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
             <div class="text-center mt-4"><button class="btn-more-link" onclick="app.router('list', {category: []})">職種をもっと見る</button></div>
+            <div style="clear:both;"></div>
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
+            <div class="text-center mt-4"><button class="btn-more-link" onclick="app.router('list', {tag: []})">こだわりをもっと見る</button></div>
+            <div style="clear:both;"></div>
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
-            
-            <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:40px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
+            <div class="text-center mt-4 mb-4"><button class="btn btn-outline" style="width:90%" onclick="app.router('list', {clear: true})">すべての求人を見る</button></div>
+            <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:20px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
                 <div style="font-size:12px; color:#666; margin-bottom:10px; display:flex; justify-content:center; gap:20px;">
                     <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
                     <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('privacy')">プライバシーポリシー</span>
                 </div>
-                <div style="font-size:11px; color:#999;">&copy; 工場ワーク NAVi</div>
+                <div style="font-size:11px; color:#999;">&copy; 株式会社Re.ACT</div>
             </div>
         `;
     },
@@ -411,7 +414,14 @@ const app = {
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
-    // ★★★ Detail Page Fix: Layout & Spec Table ★★★
+    // ★★★ Heart Button Fix ★★★
+    createJobCard: (job) => {
+        const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
+        const isApplied = app.state.user?.applied?.includes(String(job.id));
+        return `<div class="job-card" onclick="app.router('detail', ${job.id})"><div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep(${job.id})">♥</div><img src="${getJobImage(job)}" class="job-card-img"><div class="job-card-body"><div class="job-card-title">${job.title}</div><div class="mb-2">${job.isNew?'<span class="tag new">NEW</span>':''}${isApplied?'<span class="tag applied">応募済み</span>':''}${job.tags.slice(0,4).map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="job-info-row">📍 ${job.pref}</div><div class="job-info-row">💴 <span class="salary-text">${job.salary}</span></div></div><div class="card-actions"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); app.router('detail', ${job.id})">詳細</button>${isApplied ? `<button class="btn btn-disabled btn-sm">応募済み</button>` : `<button class="btn btn-accent btn-sm" onclick="event.stopPropagation(); app.state.detailId=${job.id}; app.router('form')">応募</button>`}</div></div>`;
+    },
+
+    // ★★★ Detail Page Fix: Layout ★★★
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) return;
@@ -528,35 +538,6 @@ const app = {
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
-    renderAuthPage: (target, type) => {
-        if(type === 'login') {
-            target.innerHTML = `
-                <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">ログイン</div><div style="width:40px;"></div></div>
-                <div class="container" style="padding:20px;">
-                    <input id="login-email" class="form-input mb-4" placeholder="メールアドレス">
-                    <input id="login-pass" type="password" class="form-input mb-4" placeholder="パスワード">
-                    <button class="btn btn-primary" onclick="app.login(document.getElementById('login-email').value.trim(), document.getElementById('login-pass').value.trim())">ログイン</button>
-                    <p class="mt-4 text-center" onclick="app.router('register')">新規登録はこちら</p>
-                </div>`;
-        } else {
-            const yearOpts = Array.from({length: 50}, (_, i) => 2005 - i).map(y => `<option value="${y}">${y}年</option>`).join('');
-            const monthOpts = Array.from({length: 12}, (_, i) => i + 1).map(m => `<option value="${m}">${m}月</option>`).join('');
-            const dayOpts = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}">${d}日</option>`).join('');
-            target.innerHTML = `
-                <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">無料会員登録</div><div style="width:40px;"></div></div>
-                <div class="container" style="padding:16px;">
-                    <div class="form-section">
-                        <div class="form-section-title">基本情報</div>
-                        <div class="form-group"><label class="form-label">お名前<span class="req">必須</span></label><input id="reg-name" class="form-input" placeholder="例：工場 太郎"></div>
-                        <div class="form-group"><label class="form-label">生年月日<span class="req">必須</span></label><div style="display:flex; gap:8px;"><select id="reg-year" class="form-input">${yearOpts}</select><select id="reg-month" class="form-input">${monthOpts}</select><select id="reg-day" class="form-input">${dayOpts}</select></div></div>
-                        <div class="form-group"><label class="form-label">性別</label><div class="radio-group"><label class="radio-label"><input type="radio" name="gender" value="male" checked> 男性</label><label class="radio-label"><input type="radio" name="gender" value="female"> 女性</label></div></div>
-                    </div>
-                    <div class="form-section"><div class="form-section-title">連絡先・ログイン情報</div><div class="form-group"><label class="form-label">電話番号<span class="req">必須</span></label><input id="reg-tel" type="tel" class="form-input" placeholder="09012345678"></div><div class="form-group"><label class="form-label">メールアドレス<span class="req">必須</span></label><input id="reg-email" type="email" class="form-input" placeholder="sample@example.com"></div><div class="form-group"><label class="form-label">パスワード<span class="req">必須</span></label><input id="reg-pass" type="password" class="form-input" placeholder="8文字以上"></div></div>
-                    <button class="btn btn-register w-full" onclick="app.validateAndRegister()">登録してはじめる</button>
-                </div>`;
-        }
-    },
-
     validateAndRegister: () => {
         const reqIds = ['reg-name', 'reg-tel', 'reg-email', 'reg-pass'];
         let isValid = true;
@@ -569,6 +550,7 @@ const app = {
         app.register(app.getRegisterData());
     },
 
+    // --- Other Functions ---
     removeFilter: (type, val) => {
         if (type === 'pref') app.state.filter.pref = '';
         else if (type === 'category') {
@@ -581,7 +563,7 @@ const app = {
             const el = document.querySelector(`input[name="tag"][value="${val}"]`);
             if(el) el.checked = false;
         }
-        app.renderList(document.getElementById('main-content'));
+        app.renderList(document.getElementById('main-content')); // Reload list
     },
 
     updateModalChips: () => {
@@ -626,7 +608,8 @@ const app = {
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         if (app.state.page === 'top') {
             const btn = document.getElementById('top-condition-btn');
-            if(btn) btn.innerHTML = (cats.length+tags.length) > 0 ? `<span>🔍 職種・こだわり (${cats.length+tags.length}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
+            // ボタン内のテキスト構造を維持して更新
+            if(btn) btn.querySelector('span:first-child').innerText = (cats.length+tags.length) > 0 ? `職種・こだわり (${cats.length+tags.length}件)` : '職種・こだわり条件を選択';
         } else if (app.state.page === 'list') {
             app.state.filter.category = cats; app.state.filter.tag = tags;
             app.renderList(document.getElementById('main-content'));
@@ -655,29 +638,50 @@ const app = {
     },
     
     selectPref: (p) => {
+        // 詳細条件モーダルが開いているかチェック
         const condModal = document.getElementById('condition-modal');
+        
         if(condModal && condModal.classList.contains('active')) {
+            // 条件モーダルが開いている場合
             app.closeRegionModal();
             app.state.filter.pref = p;
-            app.openConditionModal();
+            app.openConditionModal(); // 再描画
         } else {
+            // 通常時
             app.state.filter.pref = p;
             app.closeRegionModal();
+            
             if (app.state.page === 'top') {
                 const display = document.getElementById('top-pref-display');
-                if(display) display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
+                if(display) display.querySelector('span:first-child').innerText = p;
             } else {
                 app.renderList(document.getElementById('main-content'));
             }
         }
     },
 
+    // Shortened for brevity - keep original logic for these
     login: async (email, pass) => { app.toast("ログイン中..."); try { await signInWithEmailAndPassword(auth, email, pass); app.toast("ログインしました"); app.router('top'); } catch (error) { console.error(error); alert("ログイン失敗: " + error.message); } },
     logout: async () => { await signOut(auth); app.toast("ログアウトしました"); app.router('top'); },
     register: async (d) => { try { const u = await createUserWithEmailAndPassword(auth, d.email, d.password); await updateProfile(u.user, { displayName: d.name }); await setDoc(doc(db, "users", u.user.uid), { name: d.name, email: d.email, keeps: [], applied: [], createdAt: serverTimestamp() }); app.toast("登録完了！"); app.router('top'); } catch (e) { console.error(e); alert("登録エラー: " + e.message); } },
     getRegisterData: () => ({ name: document.getElementById('reg-name').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value }),
+    toggleKeep: async (id) => {
+        const idStr = String(id);
+        const currentKeeps = app.state.user ? app.state.userKeeps : app.state.guestKeeps;
+        const newStatus = !currentKeeps.includes(idStr);
+        document.querySelectorAll(`.keep-btn-${id}`).forEach(btn => { if(newStatus) btn.classList.add('active'); else btn.classList.remove('active'); });
+        if (app.state.user) {
+            if(newStatus) app.state.userKeeps.push(idStr); else app.state.userKeeps = app.state.userKeeps.filter(k=>k!==idStr);
+            await updateDoc(doc(db, "users", app.state.user.uid), { keeps: newStatus ? arrayUnion(idStr) : arrayRemove(idStr) });
+        } else {
+            if(newStatus) app.state.guestKeeps.push(idStr); else app.state.guestKeeps = app.state.guestKeeps.filter(k=>k!==idStr);
+            localStorage.setItem('factory_work_navi_guest_keeps', JSON.stringify(app.state.guestKeeps));
+            app.renderHeader();
+        }
+    },
     back: ()=>{ app.router(app.state.page==='detail'?'list':'top'); },
-    toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); }
+    toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); },
+    renderAuthPage: app.renderAuthPage // Ensure this is referenced
 };
 
 window.app = app;
