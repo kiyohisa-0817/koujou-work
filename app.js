@@ -228,6 +228,16 @@ const app = {
 
         app.renderHeader();
 
+        // ★★★ FIX: Initialize History State for Browser Back Button ★★★
+        const initialParams = new URLSearchParams(window.location.search);
+        const initialId = initialParams.get('id');
+        const initialState = {
+            page: initialId ? 'detail' : (app.state.page || 'top'),
+            id: initialId ? parseInt(initialId) : app.state.detailId
+        };
+        // Replace the "null" state with the actual current state so popstate works
+        window.history.replaceState(initialState, '', window.location.href);
+
         // Load Data
         if (GOOGLE_SHEET_CSV_URL) {
             try {
@@ -251,15 +261,12 @@ const app = {
             app.router(app.state.page || 'top', app.state.detailId, false);
         }
 
+        // Listen for Browser Back Button
         window.addEventListener('popstate', (event) => {
-            const currentParams = new URLSearchParams(window.location.search);
-            const currentId = currentParams.get('id');
-            if (currentId) {
-                app.state.detailId = parseInt(currentId);
-                app.router('detail', app.state.detailId, false);
+            if (event.state && event.state.page) {
+                app.router(event.state.page, event.state.id, false);
             } else {
-                if (event.state && event.state.page) app.router(event.state.page, event.state.id, false);
-                else app.router('top', null, false);
+                app.router('top', null, false);
             }
         });
     },
@@ -779,7 +786,16 @@ const app = {
     logout: async () => { await signOut(auth); app.toast("ログアウトしました"); app.router('top'); },
     register: async (d) => { try { const u = await createUserWithEmailAndPassword(auth, d.email, d.password); await updateProfile(u.user, { displayName: d.name }); await setDoc(doc(db, "users", u.user.uid), { name: d.name, email: d.email, keeps: [], applied: [], createdAt: serverTimestamp() }); app.toast("登録完了！"); app.router('top'); } catch (e) { console.error(e); alert("登録エラー: " + e.message); } },
     getRegisterData: () => ({ name: document.getElementById('reg-name').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value }),
-    back: ()=>{ app.router(app.state.page==='detail'?'list':'top'); },
+    
+    // ★★★ FIX: Use history.back() correctly ★★★
+    back: () => { 
+        if(window.history.length > 1) {
+            window.history.back();
+        } else {
+            app.router(app.state.page==='detail'?'list':'top');
+        }
+    },
+    
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); }
 };
 
