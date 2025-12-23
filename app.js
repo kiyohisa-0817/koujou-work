@@ -114,7 +114,7 @@ const generateJobs = (count) => {
             type: i % 4 === 0 ? "期間工" : "派遣社員",
             isNew: i <= 25,
             desc: `${pref}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
-            flow: "8:00 朝礼 → 作業開始 → 12:00 休憩 → 17:00 終了",
+            flow: "8:00〜17:00 (実働8h)",
             holidays: "土日休み（会社カレンダーによる）",
             benefits: "社会保険完備、有給休暇、制服貸与",
             apply_flow: "応募フォームより応募 → 面接（WEB可） → 採用",
@@ -191,10 +191,9 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            if(app.state.page) app.router(app.state.page, app.state.detailId, false);
+            if(app.state.page) app.router(app.state.page, app.state.detailId);
         });
 
-        // Initialize Modals if not present
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="condition-modal" class="modal-overlay">
@@ -228,7 +227,6 @@ const app = {
 
         app.renderHeader();
 
-        // Load Data
         if (GOOGLE_SHEET_CSV_URL) {
             try {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
@@ -314,7 +312,6 @@ const app = {
         else if (pageName === 'terms') { container.innerHTML = ''; app.renderTerms(container); }
     },
 
-    // ★★★ Logo Fix: Text Changed ★★★
     renderHeader: () => {
         const area = document.getElementById('header-nav-area');
         const logo = document.querySelector('.logo');
@@ -332,7 +329,6 @@ const app = {
         }
     },
 
-    // ★★★ Top Page: Restored Design (Blue Gradient) & Arrow Fix ★★★
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
         target.innerHTML = `
@@ -379,6 +375,7 @@ const app = {
 
     renderList: (target) => {
         const { pref, sort, tag, category } = app.state.filter;
+        
         const createChipsHtml = (p, cList, tList) => {
             let chips = [];
             if (p) chips.push(`<div class="filter-chip">📍 ${p} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('pref', '${p}')">×</div></div>`);
@@ -414,14 +411,12 @@ const app = {
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
-    // ★★★ Heart Button Fix ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         const isApplied = app.state.user?.applied?.includes(String(job.id));
         return `<div class="job-card" onclick="app.router('detail', ${job.id})"><div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep(${job.id})">♥</div><img src="${getJobImage(job)}" class="job-card-img"><div class="job-card-body"><div class="job-card-title">${job.title}</div><div class="mb-2">${job.isNew?'<span class="tag new">NEW</span>':''}${isApplied?'<span class="tag applied">応募済み</span>':''}${job.tags.slice(0,4).map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="job-info-row">📍 ${job.pref}</div><div class="job-info-row">💴 <span class="salary-text">${job.salary}</span></div></div><div class="card-actions"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); app.router('detail', ${job.id})">詳細</button>${isApplied ? `<button class="btn btn-disabled btn-sm">応募済み</button>` : `<button class="btn btn-accent btn-sm" onclick="event.stopPropagation(); app.state.detailId=${job.id}; app.router('form')">応募</button>`}</div></div>`;
     },
 
-    // ★★★ Detail Page Fix: Layout ★★★
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) return;
@@ -550,7 +545,6 @@ const app = {
         app.register(app.getRegisterData());
     },
 
-    // --- Other Functions ---
     removeFilter: (type, val) => {
         if (type === 'pref') app.state.filter.pref = '';
         else if (type === 'category') {
@@ -563,7 +557,7 @@ const app = {
             const el = document.querySelector(`input[name="tag"][value="${val}"]`);
             if(el) el.checked = false;
         }
-        app.renderList(document.getElementById('main-content')); // Reload list
+        app.renderList(document.getElementById('main-content'));
     },
 
     updateModalChips: () => {
@@ -587,7 +581,6 @@ const app = {
             tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
         }
         
-        // ★ 都道府県選択セクションの追加 (Modal内) ★
         const currentPref = app.state.page === 'list' ? app.state.filter.pref : '';
         const prefHtml = `
             <div class="cond-section">
@@ -608,8 +601,7 @@ const app = {
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         if (app.state.page === 'top') {
             const btn = document.getElementById('top-condition-btn');
-            // ボタン内のテキスト構造を維持して更新
-            if(btn) btn.querySelector('span:first-child').innerText = (cats.length+tags.length) > 0 ? `職種・こだわり (${cats.length+tags.length}件)` : '職種・こだわり条件を選択';
+            if(btn) btn.innerHTML = (cats.length+tags.length) > 0 ? `<span>🔍 職種・こだわり (${cats.length+tags.length}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
         } else if (app.state.page === 'list') {
             app.state.filter.category = cats; app.state.filter.tag = tags;
             app.renderList(document.getElementById('main-content'));
@@ -619,7 +611,6 @@ const app = {
 
     updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.renderListItems(); },
     
-    // ★★★ Region Modal Fix ★★★
     openRegionModal: () => { 
         document.getElementById('region-modal').classList.add('active'); 
         app.renderRegionStep1(); 
@@ -638,50 +629,30 @@ const app = {
     },
     
     selectPref: (p) => {
-        // 詳細条件モーダルが開いているかチェック
         const condModal = document.getElementById('condition-modal');
-        
         if(condModal && condModal.classList.contains('active')) {
-            // 条件モーダルが開いている場合
             app.closeRegionModal();
             app.state.filter.pref = p;
-            app.openConditionModal(); // 再描画
+            app.openConditionModal();
         } else {
-            // 通常時
             app.state.filter.pref = p;
             app.closeRegionModal();
-            
             if (app.state.page === 'top') {
                 const display = document.getElementById('top-pref-display');
-                if(display) display.querySelector('span:first-child').innerText = p;
+                if(display) display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
             } else {
                 app.renderList(document.getElementById('main-content'));
             }
         }
     },
 
-    // Shortened for brevity - keep original logic for these
     login: async (email, pass) => { app.toast("ログイン中..."); try { await signInWithEmailAndPassword(auth, email, pass); app.toast("ログインしました"); app.router('top'); } catch (error) { console.error(error); alert("ログイン失敗: " + error.message); } },
     logout: async () => { await signOut(auth); app.toast("ログアウトしました"); app.router('top'); },
     register: async (d) => { try { const u = await createUserWithEmailAndPassword(auth, d.email, d.password); await updateProfile(u.user, { displayName: d.name }); await setDoc(doc(db, "users", u.user.uid), { name: d.name, email: d.email, keeps: [], applied: [], createdAt: serverTimestamp() }); app.toast("登録完了！"); app.router('top'); } catch (e) { console.error(e); alert("登録エラー: " + e.message); } },
     getRegisterData: () => ({ name: document.getElementById('reg-name').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value }),
-    toggleKeep: async (id) => {
-        const idStr = String(id);
-        const currentKeeps = app.state.user ? app.state.userKeeps : app.state.guestKeeps;
-        const newStatus = !currentKeeps.includes(idStr);
-        document.querySelectorAll(`.keep-btn-${id}`).forEach(btn => { if(newStatus) btn.classList.add('active'); else btn.classList.remove('active'); });
-        if (app.state.user) {
-            if(newStatus) app.state.userKeeps.push(idStr); else app.state.userKeeps = app.state.userKeeps.filter(k=>k!==idStr);
-            await updateDoc(doc(db, "users", app.state.user.uid), { keeps: newStatus ? arrayUnion(idStr) : arrayRemove(idStr) });
-        } else {
-            if(newStatus) app.state.guestKeeps.push(idStr); else app.state.guestKeeps = app.state.guestKeeps.filter(k=>k!==idStr);
-            localStorage.setItem('factory_work_navi_guest_keeps', JSON.stringify(app.state.guestKeeps));
-            app.renderHeader();
-        }
-    },
     back: ()=>{ app.router(app.state.page==='detail'?'list':'top'); },
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); },
-    renderAuthPage: app.renderAuthPage // Ensure this is referenced
+    renderAuthPage: app.renderAuthPage
 };
 
 window.app = app;
