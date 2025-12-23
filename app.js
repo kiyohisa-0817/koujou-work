@@ -65,14 +65,15 @@ const TAG_GROUPS = {
 };
 const ALL_TAGS_FLAT = Object.values(TAG_GROUPS).flat();
 
+// ★★★ 変更：都道府県の並び順を北から南へ修正 ★★★
 const REGIONS = [
+    { name: "北海道・東北", icon: "❄️", prefs: ["北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県"] },
     { name: "関東", icon: "🗼", prefs: ["東京都", "神奈川県", "千葉県", "埼玉県", "茨城県", "栃木県", "群馬県"] },
-    { name: "関西", icon: "🏯", prefs: ["大阪府", "兵庫県", "京都府", "滋賀県", "奈良県", "和歌山県"] },
-    { name: "東海", icon: "🦐", prefs: ["愛知県", "静岡県", "岐阜県", "三重県"] },
-    { name: "北海道・東北", icon: "❄️", prefs: ["北海道", "宮城県", "福島県", "青森県", "岩手県", "秋田県", "山形県"] },
-    { name: "甲信越・北陸", icon: "🌾", prefs: ["新潟県", "長野県", "石川県", "富山県", "福井県", "山梨県"] },
-    { name: "中国・四国", icon: "🍋", prefs: ["広島県", "岡山県", "香川県", "愛媛県", "徳島県", "高知県", "島根県", "鳥取県", "山口県"] },
-    { name: "九州・沖縄", icon: "🌺", prefs: ["福岡県", "熊本県", "沖縄県", "佐賀県", "長崎県", "大分県", "宮崎県", "鹿児島県"] }
+    { name: "甲信越・北陸", icon: "🌾", prefs: ["新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県"] },
+    { name: "東海", icon: "🦐", prefs: ["岐阜県", "静岡県", "愛知県", "三重県"] },
+    { name: "関西", icon: "🏯", prefs: ["滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県"] },
+    { name: "中国・四国", icon: "🍋", prefs: ["鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県"] },
+    { name: "九州・沖縄", icon: "🌺", prefs: ["福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"] }
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
@@ -225,7 +226,6 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            // ★★★ 変更：初期表示やリロード時の描画では履歴を追加しない(false) ★★★
             if(app.state.page) app.router(app.state.page, app.state.detailId, false);
         });
 
@@ -265,11 +265,10 @@ const app = {
 
         document.getElementById('loading-overlay').style.display = 'none';
 
-        // URLパラメータのチェックとルーティング
+        // URL Check
         const urlParams = new URLSearchParams(window.location.search);
         const urlId = urlParams.get('id');
 
-        // ★★★ 変更：初期表示では履歴を追加しない(false) ★★★
         if (urlId) {
             app.state.detailId = parseInt(urlId);
             app.router('detail', app.state.detailId, false);
@@ -277,9 +276,23 @@ const app = {
             app.router(app.state.page || 'top', app.state.detailId, false);
         }
 
-        // ブラウザの戻る/進むボタン対応
+        // ★★★ 修正：「戻る」ボタンの挙動（popstate）をリロードではなく再描画に変更 ★★★
         window.addEventListener('popstate', (event) => {
-            window.location.reload();
+            const currentParams = new URLSearchParams(window.location.search);
+            const currentId = currentParams.get('id');
+            
+            if (currentId) {
+                // URLにIDがある場合は詳細ページへ
+                app.state.detailId = parseInt(currentId);
+                app.router('detail', app.state.detailId, false);
+            } else {
+                // IDがない場合（履歴の状態stateがあればそれに従う、なければトップへ）
+                if (event.state && event.state.page) {
+                     app.router(event.state.page, event.state.id, false);
+                } else {
+                     app.router('top', null, false);
+                }
+            }
         });
     },
 
@@ -306,7 +319,6 @@ const app = {
 
     saveState: () => sessionStorage.setItem('fwn_state', JSON.stringify(app.state)),
 
-    // ★★★ 変更：addHistory 引数を追加（デフォルトは true） ★★★
     router: (pageName, param = null, addHistory = true) => {
         if (pageName === 'detail') window.scrollTo(0, 0);
         else if (pageName === 'list' && param && param.fromTop) window.scrollTo(0, 0);
@@ -316,7 +328,6 @@ const app = {
         if(pageName === 'detail') app.state.detailId = param;
         app.saveState();
 
-        // ★★★ 変更：addHistory が true の場合のみ履歴を追加 ★★★
         if (addHistory) {
             if (pageName === 'detail' && param) {
                 const newUrl = `${window.location.pathname}?id=${param}`;
@@ -585,7 +596,7 @@ const app = {
                 </div>
                 <div style="font-size:11px; color:#999;">&copy; 株式会社Re.ACT</div>
             </div>
-            `;
+        `;
     },
 
     handleTopSearch: () => {
@@ -632,6 +643,12 @@ const app = {
             <div id="list-container" class="job-list"></div>
         `;
         document.getElementById('sort-order').value = sort;
+        app.renderListItems();
+    },
+
+    // ★★★ 追加：ソート機能用のフィルター更新関数 ★★★
+    updateFilterSingle: (key, val) => {
+        app.state.filter[key] = val;
         app.renderListItems();
     },
 
@@ -830,7 +847,6 @@ const app = {
         }
     },
 
-    // ★★★ プライバシーポリシーの描画関数 ★★★
     renderPrivacy: (target) => {
         target.innerHTML = `
             <div class="page-header-simple">
@@ -891,7 +907,6 @@ const app = {
         `;
     },
 
-    // ★★★ 利用規約の描画関数 ★★★
     renderTerms: (target) => {
         target.innerHTML = `
             <div class="page-header-simple">
