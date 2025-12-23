@@ -1,6 +1,6 @@
 /* =========================================
     CSS Reset & Variables
-    ========================================= */
+   ========================================= */
 :root {
     --primary-color: #0056b3;
     --accent-color: #ff9800;
@@ -200,10 +200,10 @@ header {
 }
 
 /* =========================================
-   ★詳細検索パネルのスタイル変更 (Modern & Understandable)
+   ★ 詳細検索パネル (見やすいボタン形式)
    ========================================= */
 .advanced-search-panel {
-    background: #f4f7f6; /* 背景色を少しグレーに */
+    background: #f4f7f6;
     border: 1px solid #ddd; border-radius: 0 0 12px 12px; 
     padding: 20px 16px; margin-top: 0;
     display: none; box-shadow: inset 0 4px 10px rgba(0,0,0,0.05); padding-bottom: 80px;
@@ -213,26 +213,44 @@ header {
 
 /* 検索条件のセクションカード */
 .cond-section {
-    background: #fff;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    background: #fff; border-radius: 12px; padding: 16px;
+    margin-bottom: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.03);
     border: 1px solid #eee;
 }
-
 .cond-head {
-    font-size: 15px;
-    font-weight: bold;
-    color: var(--primary-color);
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px dashed #eee;
-    padding-bottom: 8px;
+    font-size: 15px; font-weight: bold; color: var(--primary-color);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px dashed #eee; padding-bottom: 8px;
 }
 .cond-icon { font-size: 18px; }
+
+/* ボタン型グリッド */
+.cond-grid-modern {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+}
+@media (min-width: 400px) {
+    .cond-grid-modern { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* タップしやすいボタン風ラベル (UI改善) */
+.check-btn {
+    display: block; position: relative; cursor: pointer; margin: 0;
+}
+.check-btn input {
+    position: absolute; opacity: 0; cursor: pointer; height: 0; width: 0;
+}
+.check-btn span {
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    padding: 12px 8px; font-size: 13px; line-height: 1.3;
+    border: 1px solid #ddd; border-radius: 8px; background: #fff;
+    color: #555; font-weight: bold; transition: all 0.2s; height: 100%;
+}
+/* 選択状態 */
+.check-btn input:checked + span {
+    background: #e3f2fd; border-color: var(--primary-color);
+    color: var(--primary-color); box-shadow: 0 2px 5px rgba(0, 86, 179, 0.15);
+}
+.check-btn:active span { transform: scale(0.98); }
 
 .search-input-mock {
     width: 100%; padding: 14px; border: 2px solid #ddd; border-radius: 8px; background: #fff;
@@ -241,60 +259,9 @@ header {
 }
 .search-input-mock::after { content: '▼'; color: #999; font-size: 10px; }
 
-/* ボタン型チェックボックス (Grid Layout) */
-.cond-grid-modern {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr); /* 2列 */
-    gap: 10px;
-}
-@media (min-width: 400px) {
-    .cond-grid-modern { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-}
-
-/* タップしやすいボタン風ラベル */
-.check-btn {
-    display: block;
-    position: relative;
-    cursor: pointer;
-    margin: 0;
-}
-.check-btn input {
-    position: absolute;
-    opacity: 0;
-    cursor: pointer;
-    height: 0;
-    width: 0;
-}
-.check-btn span {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 12px 8px;
-    font-size: 13px;
-    line-height: 1.3;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    background: #fff;
-    color: #555;
-    font-weight: bold;
-    transition: all 0.2s;
-    height: 100%;
-}
-/* チェックされた状態 */
-.check-btn input:checked + span {
-    background: #e3f2fd; /* 薄い青 */
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-    box-shadow: 0 2px 5px rgba(0, 86, 179, 0.15);
-}
-.check-btn:active span { transform: scale(0.98); }
-
-/* 下部固定ボタンエリア */
 .apply-btn-wrapper {
     position: sticky; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.95);
-    border-top: 1px solid #ddd; 
-    padding: 16px;
+    border-top: 1px solid #ddd; padding: 16px;
     text-align: center; margin: 0 -16px -20px; z-index: 10; backdrop-filter: blur(5px);
 }
 
@@ -332,14 +299,26 @@ header {
 .detail-title { font-size: 22px; font-weight: 900; color: #333; line-height: 1.4; margin-bottom: 12px; }
 .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 
-/* Tabs */
+/* =========================================
+   ★ タブの横スクロールUI (Scrollable Tabs)
+   ========================================= */
 .detail-tabs {
-    display: flex; border-bottom: 1px solid #eee; background: #fff;
+    display: flex; 
+    border-bottom: 1px solid #eee; background: #fff;
     position: sticky; top: calc(var(--header-height) + env(safe-area-inset-top)); z-index: 100;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    /* Scroll Settings */
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
 }
+.detail-tabs::-webkit-scrollbar { display: none; /* Chrome/Safari */ }
+
 .detail-tab-item {
-    flex: 1; text-align: center; padding: 14px 0; font-weight: bold; color: #888;
+    flex: 0 0 auto; /* 固定幅ではなく中身に合わせて伸縮、縮まない */
+    min-width: 100px; /* タップしやすい幅を確保 */
+    text-align: center; padding: 14px 16px; font-weight: bold; color: #888;
     cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; background: #f9f9f9;
 }
 .detail-tab-item.active { 
@@ -347,6 +326,7 @@ header {
     border-bottom: 3px solid var(--primary-color); 
     background: #fff;
 }
+
 .tab-content { display: block; }
 .tab-content.hidden { display: none; }
 
