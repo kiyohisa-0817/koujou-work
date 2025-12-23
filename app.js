@@ -345,9 +345,9 @@ const app = {
             }
             container.innerHTML = ''; 
             app.renderList(container);
-            if (param && param.openAdvanced) {
-                setTimeout(() => app.toggleAdvancedSearch(true), 50);
-            }
+            // ★リスト画面で詳細検索を開くための処理★
+            // if (param && param.openAdvanced) ... という分岐は削除し、
+            // 全て openConditionModal() で統一
         }
         else if (pageName === 'detail') { container.innerHTML = ''; app.renderDetail(container, app.state.detailId); }
         else if (pageName === 'register' || pageName === 'login') { container.innerHTML = ''; app.renderAuthPage(container, pageName); }
@@ -362,7 +362,7 @@ const app = {
         const keepCount = app.state.user ? app.state.userKeeps.length : app.state.guestKeeps.length;
         const badgeHtml = keepCount > 0 ? `<span class="header-badge">${keepCount}</span>` : '';
         if (app.state.user) {
-            area.innerHTML = `<div class="header-btn-icon" onclick="app.router('mypage')"><span class="icon">👤</span>マイページ${badgeHtml}</div><div class="header-btn-icon" onclick="app.router('list', {openAdvanced: true})"><span class="icon">🔍</span>さがす</div>`;
+            area.innerHTML = `<div class="header-btn-icon" onclick="app.router('mypage')"><span class="icon">👤</span>マイページ${badgeHtml}</div><div class="header-btn-icon" onclick="app.router('list')"><span class="icon">🔍</span>さがす</div>`;
         } else {
             area.innerHTML = `<div class="header-btn-icon" onclick="app.router('mypage')"><span class="icon" style="color:#e91e63;">♥</span>キープ${badgeHtml}</div><span class="header-login-link" onclick="app.router('login')">ログイン</span><button class="btn-register-header" onclick="app.router('register')">無料会員登録</button>`;
         }
@@ -612,23 +612,6 @@ const app = {
             return chips.length > 0 ? `<div class="active-filter-area"><span class="active-filter-label">条件:</span>${chips.join('')}</div>` : '';
         };
         
-        let tagsHtml = "";
-        for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
-            // ★★★ 変更：ボタン型チェックボックス (チップ) に変更 ★★★
-            tagsHtml += `
-            <div class="cond-section">
-                <div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div>
-                <div class="cond-grid-modern">
-                    ${tags.map(t => `
-                        <label class="check-btn">
-                            <input type="checkbox" name="tag" value="${t}" ${tag.includes(t)?'checked':''} onchange="app.updateFilterMulti()">
-                            <span>${t}</span>
-                        </label>
-                    `).join('')}
-                </div>
-            </div>`;
-        }
-        
         target.innerHTML = `
             <div class="page-header-simple">
                 <button class="back-btn" onclick="app.router('top')">＜</button>
@@ -637,35 +620,11 @@ const app = {
             </div>
             <div class="sticky-search-header">
                 <div class="filter-bar">
-                    <button class="filter-toggle-btn" onclick="app.toggleAdvancedSearch()">⚡️ 条件を詳しく絞り込む</button>
+                    <button class="filter-toggle-btn" onclick="app.openConditionModal()">⚡️ 条件を詳しく絞り込む</button>
                 </div>
                 <div id="chip-container">${createChipsHtml(pref, category, tag)}</div>
             </div>
-            <div id="advanced-search" class="advanced-search-panel">
-                
-                <div class="cond-section">
-                    <div class="cond-head"><span class="cond-icon">📍</span>都道府県</div>
-                    <div class="search-input-mock" onclick="app.openRegionModal()" id="list-pref-display">${pref || '指定なし'}</div>
-                </div>
-
-                <div class="cond-section">
-                    <div class="cond-head"><span class="cond-icon">🏭</span>職種</div>
-                    <div class="cond-grid-modern">
-                        ${ALL_CATEGORIES.map(c => `
-                            <label class="check-btn">
-                                <input type="checkbox" name="cat" value="${c.id}" ${category.includes(c.id)?'checked':''} onchange="app.updateFilterMulti()">
-                                <span>${c.name}</span>
-                            </label>
-                        `).join('')}
-                    </div>
-                </div>
-
-                ${tagsHtml}
-                
-                <div class="apply-btn-wrapper">
-                    <button class="btn btn-accent w-full" style="padding:16px;" onclick="app.toggleAdvancedSearch(false)">この条件で検索 (<span id="btn-count">0</span>件)</button>
-                </div>
-            </div>
+            
             <div class="sort-area" style="padding: 10px 16px; background:#fff;"><div id="result-count" class="result-count"></div><select id="sort-order" style="border:none; color:#666; font-size:12px;" onchange="app.updateFilterSingle('sort', this.value)"><option value="new">新着順</option><option value="salary">給与順</option></select></div>
             <div id="list-container" class="job-list"></div>
         `;
@@ -679,25 +638,12 @@ const app = {
     },
 
     updateFilterMulti: () => {
-        app.state.filter.category = Array.from(document.querySelectorAll('input[name="cat"]:checked')).map(c=>c.value);
-        app.state.filter.tag = Array.from(document.querySelectorAll('input[name="tag"]:checked')).map(c=>c.value);
-        app.renderListItems();
-        
-        const { pref, category, tag } = app.state.filter;
-        let chips = [];
-        if (pref) chips.push(`<div class="filter-chip">📍 ${pref} <div class="filter-chip-remove" onclick="app.removeFilter('pref', '${pref}')">×</div></div>`);
-        category.forEach(c => chips.push(`<div class="filter-chip">🏭 ${getCategoryName(c)} <div class="filter-chip-remove" onclick="app.removeFilter('category', '${c}')">×</div></div>`));
-        tag.forEach(t => chips.push(`<div class="filter-chip">🏷️ ${t} <div class="filter-chip-remove" onclick="app.removeFilter('tag', '${t}')">×</div></div>`));
-        
-        const chipContainer = document.getElementById('chip-container');
-        if(chipContainer) {
-            chipContainer.innerHTML = chips.length > 0 ? `<div class="active-filter-area"><span class="active-filter-label">条件:</span>${chips.join('')}</div>` : '';
-        }
+        // モーダルがリスト画面で使われる場合の即時反映ロジックは削除し、
+        // 「決定」ボタンで一括反映するように closeConditionModal に統合
     },
 
     renderListItems: () => {
         const container = document.getElementById('list-container');
-        const btnCount = document.getElementById('btn-count');
         const { pref, tag, category, sort } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
             if (pref && j.pref !== pref) return false;
@@ -707,7 +653,6 @@ const app = {
         });
         if(sort==='salary') res.sort((a,b)=>b.salaryVal-a.salaryVal); else res.sort((a,b)=>b.idNum-a.idNum);
         document.getElementById('result-count').innerHTML = `検索結果：<span>${res.length}</span>件`;
-        if(btnCount) btnCount.innerText = res.length;
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
@@ -755,8 +700,6 @@ const app = {
             <div class="detail-tabs">
                 <div class="detail-tab-item active" onclick="app.switchDetailTab('info')">募集要項</div>
                 <div class="detail-tab-item" onclick="app.switchDetailTab('feature')">特徴・選考</div>
-                <div class="detail-tab-item" onclick="app.switchDetailTab('company')">企業情報</div>
-                <div class="detail-tab-item" onclick="app.switchDetailTab('map')">地図・アクセス</div>
             </div>
 
             <div class="detail-padding">
@@ -802,27 +745,6 @@ const app = {
                     <div class="detail-section-title">福利厚生</div>
                     <div class="detail-text">${job.benefits || '-'}</div>
                 </div>
-
-                <div id="tab-company" class="tab-content hidden">
-                    <div class="detail-section-title">企業情報</div>
-                    <div class="info-grid">
-                         <div class="info-item"><div class="info-label">🏢 会社名</div><div class="info-value">${job.company}</div></div>
-                         <div class="info-item"><div class="info-label">🏭 業界</div><div class="info-value">${job.industry || '製造業'}</div></div>
-                         <div class="info-item"><div class="info-label">📄 事業内容</div><div class="info-value">自動車部品の製造・販売および輸出入</div></div>
-                         <div class="info-item"><div class="info-label">👥 従業員数</div><div class="info-value">1,200名</div></div>
-                    </div>
-                </div>
-
-                <div id="tab-map" class="tab-content hidden">
-                    <div class="detail-section-title">地図・アクセス</div>
-                    <div style="background:#eee; height:200px; margin:0 20px; display:flex; align-items:center; justify-content:center; border-radius:12px; font-weight:bold; color:#888;">
-                        MAP PLACEHOLDER
-                    </div>
-                    <div class="detail-text" style="margin-top:16px;">
-                        ${job.pref}の工場エリア<br>
-                        ※詳細は面接時にお伝えします。
-                    </div>
-                </div>
             </div>
 
             <div class="fixed-cta">
@@ -839,15 +761,9 @@ const app = {
         if (tabName === 'info') {
             document.querySelectorAll('.detail-tab-item')[0].classList.add('active');
             document.getElementById('tab-info').classList.remove('hidden');
-        } else if (tabName === 'feature') {
+        } else {
             document.querySelectorAll('.detail-tab-item')[1].classList.add('active');
             document.getElementById('tab-feature').classList.remove('hidden');
-        } else if (tabName === 'company') {
-            document.querySelectorAll('.detail-tab-item')[2].classList.add('active');
-            document.getElementById('tab-company').classList.remove('hidden');
-        } else if (tabName === 'map') {
-            document.querySelectorAll('.detail-tab-item')[3].classList.add('active');
-            document.getElementById('tab-map').classList.remove('hidden');
         }
     },
 
@@ -1029,11 +945,8 @@ const app = {
         };
     },
 
-    toggleAdvancedSearch: (force) => {
-        const panel = document.getElementById('advanced-search');
-        if(!panel) return;
-        panel.classList.toggle('open', force);
-    },
+    // ★★★ toggleAdvancedSearch 削除 (openConditionModalに統一) ★★★
+
     removeFilter: (type, val) => {
         if (type === 'pref') app.state.filter.pref = '';
         else if (type === 'category') {
@@ -1072,7 +985,13 @@ const app = {
         const modal = document.getElementById('condition-modal');
         const body = document.getElementById('condition-modal-body');
         
-        // ★★★ 変更：モーダル内もボタン型チェックボックス (チップ) に変更 ★★★
+        // ★★★ 変更：トップページ/リストページ共通でモーダルを開く際に現在の選択状態を反映 ★★★
+        // リスト画面の場合は app.state.filter を参照してチェックを入れる
+        const currentCats = app.state.filter.category || [];
+        const currentTags = app.state.filter.tag || [];
+        // トップ画面から開かれた場合はまだ filter に反映されていない入力値があるかもしれないが、
+        // 今回はシンプルに state.filter または DOM から取得する形にする
+        
         let tagsHtml = "";
         for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
             tagsHtml += `
@@ -1081,7 +1000,7 @@ const app = {
                 <div class="cond-grid-modern">
                     ${tags.map(t => `
                         <label class="check-btn">
-                            <input type="checkbox" name="top-tag" value="${t}">
+                            <input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t) ? 'checked' : ''}>
                             <span>${t}</span>
                         </label>
                     `).join('')}
@@ -1095,7 +1014,7 @@ const app = {
                 <div class="cond-grid-modern">
                     ${ALL_CATEGORIES.map(c => `
                         <label class="check-btn">
-                            <input type="checkbox" name="top-cat" value="${c.id}">
+                            <input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id) ? 'checked' : ''}>
                             <span>${c.name}</span>
                         </label>
                     `).join('')}
@@ -1105,12 +1024,24 @@ const app = {
         `;
         modal.classList.add('active');
     },
+    
+    // ★★★ 変更：条件決定時の処理（トップ画面とリスト画面で挙動を分岐） ★★★
     closeConditionModal: () => {
-        const cats = document.querySelectorAll('input[name="top-cat"]:checked').length;
-        const tags = document.querySelectorAll('input[name="top-tag"]:checked').length;
-        const total = cats + tags;
-        const btn = document.getElementById('top-condition-btn');
-        if(btn) btn.innerText = total > 0 ? `職種・こだわり (${total}件選択中)` : '職種・こだわり条件を選択';
+        const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
+        const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
+        const total = cats.length + tags.length;
+
+        if (app.state.page === 'top') {
+            // トップページ：ボタンの表示テキストを更新するだけ
+            const btn = document.getElementById('top-condition-btn');
+            if(btn) btn.innerText = total > 0 ? `職種・こだわり (${total}件選択中)` : '職種・こだわり条件を選択';
+        } else if (app.state.page === 'list') {
+            // リストページ：フィルタを更新して再検索を実行
+            app.state.filter.category = cats;
+            app.state.filter.tag = tags;
+            app.renderList(document.getElementById('main-content'));
+        }
+
         document.getElementById('condition-modal').classList.remove('active');
     },
 
