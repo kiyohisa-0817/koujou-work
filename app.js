@@ -24,7 +24,6 @@ import {
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// ★★★ 設定済み (画像から読み取ったキー) ★★★
 const firebaseConfig = {
     apiKey: "AIzaSyAFCTYH5-dRit6HCc9HVK82jeyz7T7BTrs",
     authDomain: "koujou-work-navi.firebaseapp.com",
@@ -116,7 +115,7 @@ const generateJobs = (count) => {
             type: i % 4 === 0 ? "期間工" : "派遣社員",
             isNew: i <= 25,
             desc: `${pref}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
-            flow: "8:00 朝礼 → 作業開始 → 12:00 休憩 → 17:00 終了",
+            flow: "8:00〜17:00 (実働8h)",
             holidays: "土日休み（会社カレンダーによる）",
             benefits: "社会保険完備、有給休暇、制服貸与",
             apply_flow: "応募フォームより応募 → 面接（WEB可） → 採用",
@@ -306,6 +305,7 @@ const app = {
         const area = document.getElementById('header-nav-area');
         const logo = document.querySelector('.logo');
         if(logo) {
+            logo.onclick = () => app.router('top');
             logo.innerHTML = `<span class="logo-fw">工場ワーク</span><span class="logo-navi">NAVi</span><span class="logo-dot">.</span>`;
         }
         
@@ -318,6 +318,47 @@ const app = {
         }
     },
 
+    // ★★★ Top Page Fix ★★★
+    renderTop: (target) => {
+        const newJobs = JOBS_DATA.slice(0, 5);
+        target.innerHTML = `
+            <div class="hero">
+                <h1>工場・製造業の求人なら<br>工場ワーク NAVi</h1>
+                <p>全国からあなたにぴったりの職場を見つけよう！</p>
+                <div class="search-box">
+                    <div class="search-input-area">
+                        <button class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
+                        <button class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()">職種・こだわり条件を選択<span>▼</span></button>
+                    </div>
+                    <button class="btn btn-accent w-full" onclick="app.handleTopSearch()">検索する</button>
+                </div>
+            </div>
+            ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
+            <div class="section-title">職種から探す</div>
+            <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
+            <div class="text-center mt-4"><button class="btn-more-link" onclick="app.router('list', {category: []})">職種をもっと見る</button></div>
+            <div class="section-title">人気のこだわり</div>
+            <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
+            <div class="section-title">新着求人</div>
+            <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
+            
+            <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:40px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
+                <div style="font-size:12px; color:#666; margin-bottom:10px; display:flex; justify-content:center; gap:20px;">
+                    <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
+                    <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('privacy')">プライバシーポリシー</span>
+                </div>
+                <div style="font-size:11px; color:#999;">&copy; 工場ワーク NAVi</div>
+            </div>
+        `;
+    },
+
+    handleTopSearch: () => {
+        const pref = document.getElementById('top-pref-display').innerText.replace('▼','').trim();
+        const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
+        const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
+        app.router('list', { fromTop: true, pref: pref === '勤務地を選択' ? '' : pref, category, tag });
+    },
+
     renderList: (target) => {
         const { pref, sort, tag, category } = app.state.filter;
         
@@ -327,7 +368,7 @@ const app = {
             if (p) chips.push(`<div class="filter-chip">📍 ${p} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('pref', '${p}')">×</div></div>`);
             cList.forEach(c => chips.push(`<div class="filter-chip">🏭 ${getCategoryName(c)} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('category', '${c}')">×</div></div>`));
             tList.forEach(t => chips.push(`<div class="filter-chip">🏷️ ${t} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('tag', '${t}')">×</div></div>`));
-            return chips.length > 0 ? `<div class="active-filter-area"><span class="active-filter-label">条件:</span>${chips.join('')}</div>` : '';
+            return chips.length > 0 ? `<div class="active-filter-area">${chips.join('')}</div>` : '';
         };
         
         target.innerHTML = `
@@ -357,7 +398,7 @@ const app = {
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
-    // ★★★ Detail Page (New Design & 2 Tabs) ★★★
+    // ★★★ Detail Page (New Table Design) ★★★
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) return;
@@ -383,9 +424,9 @@ const app = {
             <div class="detail-padding">
                 <div id="tab-info" class="tab-content">
                     <div class="detail-summary-card">
-                        <div class="summary-row"><div class="summary-icon">💴</div><div class="summary-val highlight">${job.salary}</div></div>
-                        <div class="summary-row"><div class="summary-icon">📍</div><div class="summary-val">${job.pref}</div></div>
-                        <div class="summary-row"><div class="summary-icon">🏭</div><div class="summary-val">${job.type}</div></div>
+                        <div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div>
+                        <div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}</span></div>
+                        <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
                     </div>
                     <div class="spec-header">仕事内容</div>
                     <div class="detail-description">${job.desc}</div>
@@ -450,7 +491,6 @@ const app = {
     },
 
     submitForm: async () => {
-        // Validation Logic
         const nameEl = document.getElementById('inp-name');
         const phoneEl = document.getElementById('inp-phone');
         let isValid = true;
@@ -463,7 +503,6 @@ const app = {
         if (!isValid) { alert("未入力の必須項目があります"); return; }
         
         app.toast("送信中...");
-        // (Existing submit logic...)
         try {
             const jobId = String(app.state.detailId);
             const job = JOBS_DATA.find(j => String(j.id) === jobId);
@@ -555,7 +594,19 @@ const app = {
         for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
             tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
         }
-        body.innerHTML = `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${tagsHtml}`;
+        
+        // ★ 都道府県選択セクションの追加 (Modal内) ★
+        const currentPref = app.state.page === 'list' ? app.state.filter.pref : '';
+        const prefHtml = `
+            <div class="cond-section">
+                <div class="cond-head"><span class="cond-icon">📍</span>都道府県</div>
+                <div style="background:#f9f9f9; padding:12px; border-radius:8px; text-align:center; font-weight:bold; color:#555;" onclick="app.openRegionModal()">
+                    ${currentPref || '選択されていません'} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>
+                </div>
+            </div>
+        `;
+
+        body.innerHTML = `${prefHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${tagsHtml}`;
         modal.classList.add('active');
         app.updateModalChips();
     },
@@ -594,24 +645,24 @@ const app = {
             app.renderHeader();
         }
     },
-    handleTopSearch: () => {
-        const pref = document.getElementById('top-pref-display').innerText;
-        const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
-        const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
-        app.router('list', { fromTop: true, pref: pref === '勤務地を選択' ? '' : pref, category, tag });
-    },
     openRegionModal: () => { document.getElementById('region-modal').classList.add('active'); app.renderRegionStep1(); },
     closeRegionModal: () => document.getElementById('region-modal').classList.remove('active'),
     renderRegionStep1: () => { document.getElementById('modal-header').children[0].innerText = "勤務地を選択"; document.getElementById('modal-body').innerHTML = `<div class="region-grid">${REGIONS.map((r, i) => `<div class="region-btn" onclick="app.renderRegionStep2(${i})"><span class="icon">${r.icon}</span><span>${r.name}</span></div>`).join('')}</div>`; },
     renderRegionStep2: (idx) => { const r = REGIONS[idx]; document.getElementById('modal-header').children[0].innerText = r.name; document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.selectPref('${p}')">${p}</div>`).join('')}</div>`; },
     selectPref: (p) => {
-        app.closeRegionModal();
-        if (app.state.page === 'top') document.getElementById('top-pref-display').innerText = p;
-        else { app.state.filter.pref = p; app.renderList(document.getElementById('main-content')); }
-    },
-    renderTop: (target) => {
-        const newJobs = JOBS_DATA.slice(0, 5);
-        target.innerHTML = `<div class="hero"><h1>工場・製造業の求人なら<br>工場ワーク NAVi</h1><p>全国からあなたにぴったりの職場を見つけよう！</p><div class="search-box"><div class="search-input-area"><button class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button><button class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()">職種・こだわり条件を選択<span>▼</span></button></div><button class="btn btn-accent w-full" onclick="app.handleTopSearch()">検索</button></div></div>${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}<div class="section-title">職種から探す</div><div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div><div class="text-center mt-4"><button class="btn-more-link" onclick="app.router('list', {category: []})">職種をもっと見る</button></div><div class="section-title">人気のこだわり</div><div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div><div class="section-title">新着求人</div><div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>`;
+        // 詳細条件モーダルが開いている場合は、そこへ戻る必要があるが、
+        // 今回はシンプルにフィルタにセットして閉じる（リスト画面なら即反映）
+        app.state.filter.pref = p;
+        if(document.getElementById('condition-modal').classList.contains('active')) {
+            // 条件モーダルが開いているなら、モーダル内の表示を更新して地域モーダルだけ閉じる
+            // (簡易実装: 地域モーダルを閉じる -> 条件モーダルはそのまま)
+            app.closeRegionModal();
+            app.openConditionModal(); // 再描画して地域を表示更新
+        } else {
+            app.closeRegionModal();
+            if (app.state.page === 'top') document.getElementById('top-pref-display').innerText = p;
+            else app.renderList(document.getElementById('main-content'));
+        }
     },
     login: async (email, pass) => { app.toast("ログイン中..."); try { await signInWithEmailAndPassword(auth, email, pass); app.toast("ログインしました"); app.router('top'); } catch (error) { console.error(error); alert("ログイン失敗: " + error.message); } },
     logout: async () => { await signOut(auth); app.toast("ログアウトしました"); app.router('top'); },
