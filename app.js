@@ -79,7 +79,7 @@ const getJobImage = (job) => {
     const catId = job.category;
     let color = '#0056b3', icon = '🏭';
     if(['light','clean'].includes(catId)) { color = '#28a745'; icon = '📦'; }
-    else if(['assembly','metal','press'].includes(catId)) { color = '#0056b3'; icon = '🔧'; }
+    else if(['assembly','metal','press','cast'].includes(catId)) { color = '#0056b3'; icon = '🔧'; }
     else if(['logistics','fork','driver'].includes(catId)) { color = '#ff9800'; icon = '🚜'; }
     else if(['food'].includes(catId)) { color = '#e91e63'; icon = '🍱'; }
     const svg = `<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${color}" fill-opacity="0.1"/><text x="50%" y="55%" font-family="Arial" font-size="120" text-anchor="middle" dy=".3em">${icon}</text></svg>`;
@@ -191,7 +191,7 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            if(app.state.page) app.router(app.state.page, app.state.detailId);
+            if(app.state.page) app.router(app.state.page, app.state.detailId, false);
         });
 
         if(!document.getElementById('condition-modal')) {
@@ -329,6 +329,7 @@ const app = {
         }
     },
 
+    // ★★★ Top Page Fixes ★★★
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
         target.innerHTML = `
@@ -375,7 +376,6 @@ const app = {
 
     renderList: (target) => {
         const { pref, sort, tag, category } = app.state.filter;
-        
         const createChipsHtml = (p, cList, tList) => {
             let chips = [];
             if (p) chips.push(`<div class="filter-chip">📍 ${p} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('pref', '${p}')">×</div></div>`);
@@ -411,12 +411,14 @@ const app = {
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
+    // ★★★ Heart Button Fix ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         const isApplied = app.state.user?.applied?.includes(String(job.id));
         return `<div class="job-card" onclick="app.router('detail', ${job.id})"><div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep(${job.id})">♥</div><img src="${getJobImage(job)}" class="job-card-img"><div class="job-card-body"><div class="job-card-title">${job.title}</div><div class="mb-2">${job.isNew?'<span class="tag new">NEW</span>':''}${isApplied?'<span class="tag applied">応募済み</span>':''}${job.tags.slice(0,4).map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="job-info-row">📍 ${job.pref}</div><div class="job-info-row">💴 <span class="salary-text">${job.salary}</span></div></div><div class="card-actions"><button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); app.router('detail', ${job.id})">詳細</button>${isApplied ? `<button class="btn btn-disabled btn-sm">応募済み</button>` : `<button class="btn btn-accent btn-sm" onclick="event.stopPropagation(); app.state.detailId=${job.id}; app.router('form')">応募</button>`}</div></div>`;
     },
 
+    // ★★★ Detail Page Fix: Layout ★★★
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) return;
@@ -581,6 +583,7 @@ const app = {
             tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
         }
         
+        // ★ 都道府県選択セクションの追加 (Modal内) ★
         const currentPref = app.state.page === 'list' ? app.state.filter.pref : '';
         const prefHtml = `
             <div class="cond-section">
@@ -611,6 +614,7 @@ const app = {
 
     updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.renderListItems(); },
     
+    // ★★★ Region Modal Fix ★★★
     openRegionModal: () => { 
         document.getElementById('region-modal').classList.add('active'); 
         app.renderRegionStep1(); 
