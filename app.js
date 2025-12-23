@@ -39,7 +39,7 @@ const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 
 // ===============================================
-// Config & Constants
+// Config: GAS URL & CSV URL
 // ===============================================
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRdK1TXUJlZll4AbgNAoU33X3JiMJek8Z8ZpQhALxBCC3T7nfnN211M7TeS7tTfVW/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
@@ -227,7 +227,27 @@ const app = {
             }
         }
         document.getElementById('loading-overlay').style.display = 'none';
-        app.router(app.state.page || 'top', app.state.detailId);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlId = urlParams.get('id');
+        if (urlId) {
+            app.state.detailId = parseInt(urlId);
+            app.router('detail', app.state.detailId, false);
+        } else {
+            app.router(app.state.page || 'top', app.state.detailId, false);
+        }
+
+        window.addEventListener('popstate', (event) => {
+            const currentParams = new URLSearchParams(window.location.search);
+            const currentId = currentParams.get('id');
+            if (currentId) {
+                app.state.detailId = parseInt(currentId);
+                app.router('detail', app.state.detailId, false);
+            } else {
+                if (event.state && event.state.page) app.router(event.state.page, event.state.id, false);
+                else app.router('top', null, false);
+            }
+        });
     },
 
     syncUserKeeps: (uid) => {
@@ -250,14 +270,16 @@ const app = {
 
     saveState: () => sessionStorage.setItem('fwn_state', JSON.stringify(app.state)),
 
-    router: (pageName, param = null) => {
-        if (pageName === 'detail') window.scrollTo(0, 0);
-        else if (pageName === 'list' && param && param.fromTop) window.scrollTo(0, 0);
-        else if (pageName !== 'detail' && pageName !== app.state.page) window.scrollTo(0, 0);
-
+    router: (pageName, param = null, addHistory = true) => {
+        window.scrollTo(0, 0);
         app.state.page = pageName;
         if(pageName === 'detail') app.state.detailId = param;
         app.saveState();
+
+        if (addHistory) {
+            const newUrl = (pageName === 'detail' && param) ? `${window.location.pathname}?id=${param}` : window.location.pathname;
+            window.history.pushState({page: pageName, id: param}, '', newUrl);
+        }
         
         const container = document.getElementById('main-content');
         if (pageName === 'top') { container.innerHTML = ''; app.renderTop(container); }
@@ -278,6 +300,7 @@ const app = {
         else if (pageName === 'terms') { container.innerHTML = ''; app.renderTerms(container); }
     },
 
+    // ★★★ Logo Change & Header ★★★
     renderHeader: () => {
         const area = document.getElementById('header-nav-area');
         const logo = document.querySelector('.logo');
@@ -285,6 +308,7 @@ const app = {
             logo.onclick = () => app.router('top');
             logo.innerHTML = `<span class="logo-fw">工場ワーク</span><span class="logo-navi">NAVi</span><span class="logo-dot">.</span>`;
         }
+        
         const keepCount = app.state.user ? app.state.userKeeps.length : app.state.guestKeeps.length;
         const badgeHtml = keepCount > 0 ? `<span class="header-badge">${keepCount}</span>` : '';
         if (app.state.user) {
@@ -294,7 +318,7 @@ const app = {
         }
     },
 
-    // ★★★ Top Page: Restored Design ★★★
+    // ★★★ Top Page: Restored Modern Design ★★★
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
         target.innerHTML = `
@@ -366,7 +390,7 @@ const app = {
 
     handleTopSearch: () => {
         const prefText = document.getElementById('top-pref-display').innerText;
-        const pref = prefText.includes('勤務地') ? '' : prefText.replace('📍 ', '').replace(' ▼','');
+        const pref = prefText.includes('勤務地') ? '' : prefText.replace('📍 ', '').replace(' ▼','').replace('変更する >','').trim();
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         app.router('list', { fromTop: true, pref, category, tag });
@@ -445,7 +469,7 @@ const app = {
                 <img src="${getJobImage(job)}" class="detail-img-full">
             </div>
             <div class="detail-header">
-                <div class="job-tags">${job.tags.map(t=>`<span class="tag-mini">${t}</span>`).join('')}</div>
+                <div class="detail-tags">${job.tags.map(t=>`<span class="tag-mini">${t}</span>`).join('')}</div>
                 <div class="detail-company">${job.company}</div>
                 <div class="detail-title">${job.title}</div>
             </div>
@@ -591,7 +615,6 @@ const app = {
         app.register(app.getRegisterData());
     },
 
-    // --- Other Functions ---
     removeFilter: (type, val) => {
         if (type === 'pref') app.state.filter.pref = '';
         else if (type === 'category') {
@@ -678,19 +701,14 @@ const app = {
     },
     
     selectPref: (p) => {
-        // 詳細条件モーダルが開いているかチェック
         const condModal = document.getElementById('condition-modal');
-        
         if(condModal && condModal.classList.contains('active')) {
-            // 条件モーダルが開いている場合: 
             app.closeRegionModal();
             app.state.filter.pref = p;
-            app.openConditionModal(); // 再描画
+            app.openConditionModal();
         } else {
-            // 通常時
             app.state.filter.pref = p;
             app.closeRegionModal();
-            
             if (app.state.page === 'top') {
                 const display = document.getElementById('top-pref-display');
                 if(display) display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
