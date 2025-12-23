@@ -18,35 +18,10 @@
     <div id="main-content" class="container">
         <div id="loading-overlay">
             <div class="spinner"></div>
-            <div style="font-weight:bold; color:#666;">Loading...</div>
         </div>
     </div>
 
     <div id="toast" class="toast">メッセージ</div>
-
-    <div id="region-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span id="modal-title">勤務地を選択</span>
-                <button class="modal-close" onclick="window.app.closeRegionModal()">×</button>
-            </div>
-            <div class="modal-body" id="modal-body"></div>
-        </div>
-    </div>
-
-    <div id="condition-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span>詳細条件を設定</span>
-                <button class="modal-close" onclick="window.app.closeConditionModal()">×</button>
-            </div>
-            <div id="modal-active-chips" class="modal-chip-bar"></div>
-            <div class="modal-body" id="condition-modal-body"></div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" onclick="window.app.closeConditionModal()">この条件で決定</button>
-            </div>
-        </div>
-    </div>
 
     <script type="module" src="app.js"></script>
 
