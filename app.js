@@ -236,6 +236,7 @@ const app = {
                             <span>詳細条件を設定</span>
                             <button class="modal-close" onclick="app.closeConditionModal()">×</button>
                         </div>
+                        <div id="modal-active-chips" class="modal-chip-bar"></div>
                         <div class="modal-body" id="condition-modal-body"></div>
                         <div class="modal-footer">
                             <button class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button>
@@ -345,9 +346,6 @@ const app = {
             }
             container.innerHTML = ''; 
             app.renderList(container);
-            // ★リスト画面で詳細検索を開くための処理★
-            // if (param && param.openAdvanced) ... という分岐は削除し、
-            // 全て openConditionModal() で統一
         }
         else if (pageName === 'detail') { container.innerHTML = ''; app.renderDetail(container, app.state.detailId); }
         else if (pageName === 'register' || pageName === 'login') { container.innerHTML = ''; app.renderAuthPage(container, pageName); }
@@ -604,6 +602,8 @@ const app = {
 
     renderList: (target) => {
         const { pref, sort, tag, category } = app.state.filter;
+        
+        // ★ リスト画面上部のチップ生成 ★
         const createChipsHtml = (p, cList, tList) => {
             let chips = [];
             if (p) chips.push(`<div class="filter-chip">📍 ${p} <div class="filter-chip-remove" onclick="app.removeFilter('pref', '${p}')">×</div></div>`);
@@ -638,8 +638,7 @@ const app = {
     },
 
     updateFilterMulti: () => {
-        // モーダルがリスト画面で使われる場合の即時反映ロジックは削除し、
-        // 「決定」ボタンで一括反映するように closeConditionModal に統合
+        // モーダル内の操作はここでは行わず、updateModalChipsで処理
     },
 
     renderListItems: () => {
@@ -945,8 +944,6 @@ const app = {
         };
     },
 
-    // ★★★ toggleAdvancedSearch 削除 (openConditionModalに統一) ★★★
-
     removeFilter: (type, val) => {
         if (type === 'pref') app.state.filter.pref = '';
         else if (type === 'category') {
@@ -985,22 +982,20 @@ const app = {
         const modal = document.getElementById('condition-modal');
         const body = document.getElementById('condition-modal-body');
         
-        // ★★★ 変更：トップページ/リストページ共通でモーダルを開く際に現在の選択状態を反映 ★★★
-        // リスト画面の場合は app.state.filter を参照してチェックを入れる
-        const currentCats = app.state.filter.category || [];
-        const currentTags = app.state.filter.tag || [];
-        // トップ画面から開かれた場合はまだ filter に反映されていない入力値があるかもしれないが、
-        // 今回はシンプルに state.filter または DOM から取得する形にする
+        // リスト画面の場合は現在のフィルタを、トップ画面の場合は選択済みなし(または保持しているならそれ)を反映
+        const currentCats = app.state.page === 'list' ? (app.state.filter.category || []) : [];
+        const currentTags = app.state.page === 'list' ? (app.state.filter.tag || []) : [];
         
         let tagsHtml = "";
         for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
+            // ★ 一覧性の高いグリッド表示に戻す ★
             tagsHtml += `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div>
                 <div class="cond-grid-modern">
                     ${tags.map(t => `
                         <label class="check-btn">
-                            <input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t) ? 'checked' : ''}>
+                            <input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t) ? 'checked' : ''} onchange="app.updateModalChips()">
                             <span>${t}</span>
                         </label>
                     `).join('')}
@@ -1014,7 +1009,7 @@ const app = {
                 <div class="cond-grid-modern">
                     ${ALL_CATEGORIES.map(c => `
                         <label class="check-btn">
-                            <input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id) ? 'checked' : ''}>
+                            <input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id) ? 'checked' : ''} onchange="app.updateModalChips()">
                             <span>${c.name}</span>
                         </label>
                     `).join('')}
@@ -1023,20 +1018,31 @@ const app = {
             ${tagsHtml}
         `;
         modal.classList.add('active');
+        app.updateModalChips(); // 初期描画
     },
-    
-    // ★★★ 変更：条件決定時の処理（トップ画面とリスト画面で挙動を分岐） ★★★
+
+    // ★ モーダル上部のチップを更新する関数 ★
+    updateModalChips: () => {
+        const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => ({val: c.value, label: getCategoryName(c.value)}));
+        const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => ({val: t.value, label: t.value}));
+        
+        const container = document.getElementById('modal-active-chips');
+        let html = '';
+        cats.forEach(c => html += `<div class="filter-chip">🏭 ${c.label}</div>`);
+        tags.forEach(t => html += `<div class="filter-chip">🏷️ ${t.label}</div>`);
+        
+        container.innerHTML = html;
+    },
+
     closeConditionModal: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const total = cats.length + tags.length;
 
         if (app.state.page === 'top') {
-            // トップページ：ボタンの表示テキストを更新するだけ
             const btn = document.getElementById('top-condition-btn');
             if(btn) btn.innerText = total > 0 ? `職種・こだわり (${total}件選択中)` : '職種・こだわり条件を選択';
         } else if (app.state.page === 'list') {
-            // リストページ：フィルタを更新して再検索を実行
             app.state.filter.category = cats;
             app.state.filter.tag = tags;
             app.renderList(document.getElementById('main-content'));
