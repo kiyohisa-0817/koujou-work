@@ -228,7 +228,7 @@ const app = {
 
         app.renderHeader();
 
-        // ★★★ FIX: Initialize History State for Browser Back Button ★★★
+        // ★★★ FIX: Initialize History State Correctly ★★★
         const initialParams = new URLSearchParams(window.location.search);
         const initialId = initialParams.get('id');
         const initialState = {
@@ -261,11 +261,23 @@ const app = {
             app.router(app.state.page || 'top', app.state.detailId, false);
         }
 
-        // Listen for Browser Back Button
+        // ★★★ FIX: Robust Popstate Handler (URL First) ★★★
         window.addEventListener('popstate', (event) => {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            
+            // 1. If URL has ID, it MUST be Detail page
+            if (id) {
+                app.router('detail', parseInt(id), false);
+                return;
+            }
+
+            // 2. If no ID, it's Top, List, or MyPage
+            // We rely on event.state to distinguish List/MyPage, otherwise default to Top
             if (event.state && event.state.page) {
                 app.router(event.state.page, event.state.id, false);
             } else {
+                // Default fallback if state is lost but URL is root
                 app.router('top', null, false);
             }
         });
