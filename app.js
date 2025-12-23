@@ -191,7 +191,14 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            if(app.state.page) app.router(app.state.page, app.state.detailId, false);
+            // Load based on URL initially
+            const currentParams = new URLSearchParams(window.location.search);
+            const currentId = currentParams.get('id');
+            if(currentId) {
+                app.router('detail', parseInt(currentId), false);
+            } else {
+                app.router(app.state.page || 'top', app.state.detailId, false);
+            }
         });
 
         // Initialize Modals if not present
@@ -228,14 +235,13 @@ const app = {
 
         app.renderHeader();
 
-        // ★★★ FIX: Initialize History State Correctly ★★★
+        // ★★★ FIX: Initialize History State ★★★
         const initialParams = new URLSearchParams(window.location.search);
         const initialId = initialParams.get('id');
         const initialState = {
-            page: initialId ? 'detail' : (app.state.page || 'top'),
-            id: initialId ? parseInt(initialId) : app.state.detailId
+            page: initialId ? 'detail' : 'top',
+            id: initialId ? parseInt(initialId) : null
         };
-        // Replace the "null" state with the actual current state so popstate works
         window.history.replaceState(initialState, '', window.location.href);
 
         // Load Data
@@ -252,35 +258,28 @@ const app = {
         }
         document.getElementById('loading-overlay').style.display = 'none';
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlId = urlParams.get('id');
-        if (urlId) {
-            app.state.detailId = parseInt(urlId);
-            app.router('detail', app.state.detailId, false);
-        } else {
-            app.router(app.state.page || 'top', app.state.detailId, false);
-        }
+        // ★★★ FIX: Strongest Popstate Handling ★★★
+        // Assign directly to onpopstate to ensure priority and avoid conflicts
+        window.onpopstate = (event) => {
+            // Slight delay to allow browser to finish updating location
+            setTimeout(() => {
+                const params = new URLSearchParams(window.location.search);
+                const id = params.get('id');
+                
+                // 1. Trust URL first
+                if (id) {
+                    app.router('detail', parseInt(id), false);
+                    return;
+                }
 
-        // ★★★ FIX: Robust Popstate Handler (URL First) ★★★
-        window.addEventListener('popstate', (event) => {
-            const params = new URLSearchParams(window.location.search);
-            const id = params.get('id');
-            
-            // 1. If URL has ID, it MUST be Detail page
-            if (id) {
-                app.router('detail', parseInt(id), false);
-                return;
-            }
-
-            // 2. If no ID, it's Top, List, or MyPage
-            // We rely on event.state to distinguish List/MyPage, otherwise default to Top
-            if (event.state && event.state.page) {
-                app.router(event.state.page, event.state.id, false);
-            } else {
-                // Default fallback if state is lost but URL is root
-                app.router('top', null, false);
-            }
-        });
+                // 2. Fallback to state or Top
+                if (event.state && event.state.page) {
+                    app.router(event.state.page, event.state.id, false);
+                } else {
+                    app.router('top', null, false);
+                }
+            }, 10);
+        };
     },
 
     syncUserKeeps: (uid) => {
