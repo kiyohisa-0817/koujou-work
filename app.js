@@ -1,4 +1,3 @@
-// ... (Firebase Import等は変更なし) ...
 // ===============================================
 // Firebase Integration
 // ===============================================
@@ -38,7 +37,9 @@ const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 
-// ... (定数定義、generateJobs, parseCSV関数などは変更なし) ...
+// ===============================================
+// Config & Constants
+// ===============================================
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRdK1TXUJlZll4AbgNAoU33X3JiMJek8Z8ZpQhALxBCC3T7nfnN211M7TeS7tTfVW/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
 
@@ -72,6 +73,7 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
+// --- Utils ---
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
@@ -91,6 +93,7 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
+// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
     for (let i = 1; i <= count; i++) {
@@ -158,7 +161,6 @@ const parseCSV = (text) => {
 // --- App Core ---
 const app = {
     state: {
-        // "Page" variables removed. We rely on URL now.
         filter: { pref: '', tag: [], category: [], sort: 'new' },
         user: null,
         guestKeeps: [],
@@ -166,18 +168,17 @@ const app = {
     },
 
     init: async () => {
-        // Load saved settings
+        // Settings
         const savedState = sessionStorage.getItem('fwn_state');
         if (savedState) {
             const parsed = JSON.parse(savedState);
             app.state.filter = parsed.filter || app.state.filter;
             app.state.mypageTab = parsed.mypageTab || 'keep';
         }
-        
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
         if (savedGuestKeeps) app.state.guestKeeps = JSON.parse(savedGuestKeeps);
 
-        // Auth Logic
+        // Auth
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 app.state.user = { uid: user.uid, email: user.email, name: user.displayName || "ゲスト" };
@@ -187,7 +188,6 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            // ★ Force Render on Auth Change based on CURRENT URL
             app.resolveUrlAndRender();
         });
 
@@ -219,23 +219,27 @@ const app = {
         }
         document.getElementById('loading-overlay').style.display = 'none';
 
-        // ★★★ FIX: Initial Render based on URL ★★★
+        // ★★★ Fix: Initial Render ★★★
+        // Ensure the initial history state matches the URL
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        const page = params.get('page');
+        window.history.replaceState({ id, page }, '', window.location.href);
+        
+        // Render current view
         app.resolveUrlAndRender();
-
-        // ★★★ FIX: Robust Popstate Handler (Source of Truth is URL) ★★★
-        window.onpopstate = () => {
-            app.resolveUrlAndRender();
-        };
     },
 
-    // ★★★ NEW CORE FUNCTION: Decides what to show based on URL ★★★
+    // ★★★ NEW CORE: URL-Based Router ★★★
     resolveUrlAndRender: () => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
-        const page = params.get('page'); // Support ?page=mypage, ?page=list
+        const page = params.get('page');
 
         const container = document.getElementById('main-content');
-        container.innerHTML = ''; // Clear content first
+        if (!container) return;
+        
+        container.innerHTML = '';
 
         if (id) {
             app.renderDetail(container, parseInt(id));
@@ -250,37 +254,40 @@ const app = {
         } else if (page === 'form') {
             app.renderForm(container);
         } else {
-            // Default to Top
             app.renderTop(container);
         }
-        window.scrollTo(0, 0);
+        // Don't scroll on simple back navigation if possible, but for now scroll top is safer
+        // window.scrollTo(0, 0); 
     },
 
-    // ★★★ FIX: Router only updates URL, then calls Resolve ★★★
     router: (pageName, param = null) => {
-        let newUrl = window.location.pathname;
+        let url = window.location.pathname;
+        let query = {};
         
         if (pageName === 'detail' && param) {
-            newUrl += `?id=${param}`;
+            query.id = param;
         } else if (pageName !== 'top') {
-            newUrl += `?page=${pageName}`;
+            query.page = pageName;
         }
-        // If top, newUrl is just pathname (root)
 
-        // Push state to browser history
-        window.history.pushState({}, '', newUrl);
+        const queryString = new URLSearchParams(query).toString();
+        const newUrl = queryString ? `${url}?${queryString}` : url;
+
+        // Prevent pushing same state
+        if (newUrl !== window.location.pathname + window.location.search) {
+            window.history.pushState(query, '', newUrl);
+        }
         
-        // Save filter state manually since we don't put it in URL
         sessionStorage.setItem('fwn_state', JSON.stringify({
             filter: app.state.filter,
             mypageTab: app.state.mypageTab
         }));
 
-        // Render immediately
         app.resolveUrlAndRender();
+        window.scrollTo(0, 0);
     },
 
-    // ... (SyncUserKeeps - No Change) ...
+    // ... (Existing Functions: Sync, Renderers) ...
     syncUserKeeps: (uid) => {
         const userRef = doc(db, "users", uid);
         onSnapshot(userRef, (docSnap) => {
@@ -292,13 +299,11 @@ const app = {
                 setDoc(userRef, { keeps: [], applied: [], email: app.state.user.email }, { merge: true });
                 app.state.userKeeps = [];
             }
-            // Re-render current view to reflect keep status changes
             app.resolveUrlAndRender(); 
             app.renderHeader();
         });
     },
 
-    // ... (Render Header/Top - No Change) ...
     renderHeader: () => {
         const area = document.getElementById('header-nav-area');
         const logo = document.querySelector('.logo');
@@ -331,18 +336,14 @@ const app = {
                 </div>
             </div>
             ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
-            
             <div class="section-title">職種から探す</div>
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
-            
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">こだわりをもっと見る</button></div>
-            
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
-            
             <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:40px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
                 <div style="font-size:12px; color:#666; margin-bottom:10px; display:flex; justify-content:center; gap:20px;">
                     <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
@@ -397,7 +398,7 @@ const app = {
             localStorage.setItem('factory_work_navi_guest_keeps', JSON.stringify(app.state.guestKeeps));
             app.renderHeader();
             document.querySelectorAll(`.keep-btn-${id}`).forEach(b => b.classList.toggle('active'));
-            // Refresh view if needed
+            // Refresh if on MyPage
             if(window.location.search.includes('mypage')) app.resolveUrlAndRender();
         }
     },
@@ -407,7 +408,6 @@ const app = {
         const pref = prefText.includes('勤務地') ? '' : prefText.replace('▼','').replace('変更する >','').trim();
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
-        // Note: We handle passing filters via state, router just goes to list page
         app.state.filter.pref = pref;
         app.state.filter.category = category;
         app.state.filter.tag = tag;
@@ -452,7 +452,6 @@ const app = {
     },
 
     renderDetail: (target, id) => {
-        // Need to ensure ID is string/number match
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) {
             target.innerHTML = '<p class="text-center mt-4">求人が見つかりません</p>';
@@ -471,12 +470,7 @@ const app = {
                 <div class="detail-company">${job.company}</div>
                 <div class="detail-title">${job.title}</div>
             </div>
-            
-            <div class="detail-tabs">
-                <div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div>
-                <div class="detail-tab-item" onclick="app.switchDetailTab(1)">特徴・選考</div>
-            </div>
-
+            <div class="detail-tabs"><div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div><div class="detail-tab-item" onclick="app.switchDetailTab(1)">特徴・選考</div></div>
             <div class="detail-padding">
                 <div id="tab-info" class="tab-content">
                     <div class="detail-summary-card">
@@ -484,9 +478,7 @@ const app = {
                         <div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}</span></div>
                         <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
                     </div>
-                    <div class="spec-header">仕事内容</div>
-                    <div class="detail-description">${job.desc}</div>
-                    
+                    <div class="spec-header">仕事内容</div><div class="detail-description">${job.desc}</div>
                     <div class="spec-header">募集要項</div>
                     <div class="spec-container">
                         <div class="spec-row"><div class="spec-label">給与</div><div class="spec-value">${job.salary}</div></div>
@@ -500,14 +492,9 @@ const app = {
                         <div class="spec-row"><div class="spec-label">応募資格</div><div class="spec-value">${job.qualifications || '未経験歓迎'}</div></div>
                     </div>
                 </div>
-                
                 <div id="tab-feature" class="tab-content hidden">
-                    <div class="spec-header">PRポイント</div>
-                    <div class="detail-description">${job.points || '特にありません'}</div>
-                    
-                    <div class="spec-header">福利厚生</div>
-                    <div class="detail-description">${job.benefits || '-'}</div>
-
+                    <div class="spec-header">PRポイント</div><div class="detail-description">${job.points || '特にありません'}</div>
+                    <div class="spec-header">福利厚生</div><div class="detail-description">${job.benefits || '-'}</div>
                     <div class="spec-header">応募・選考</div>
                     <div class="spec-container">
                         <div class="spec-row"><div class="spec-label">応募方法</div><div class="spec-value">${job.apply_flow || '-'}</div></div>
@@ -515,7 +502,6 @@ const app = {
                     </div>
                 </div>
             </div>
-
             <div class="fixed-cta">
                 <button class="btn-fav ${isKeep?'active':''} keep-btn-${job.id}" onclick="app.toggleKeep(${job.id})">♥</button>
                 ${isApplied ? `<button class="btn-apply-lg" style="background:#ccc; box-shadow:none; cursor:default;">応募済み</button>` : `<button class="btn-apply-lg" onclick="app.router('form')">今すぐ応募する 🚀</button>`}
@@ -531,7 +517,7 @@ const app = {
 
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
-        const id = params.get('id') || app.state.detailId; // fallback logic if simple reload
+        const id = params.get('id');
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">応募フォーム</div><div style="width:40px;"></div></div>
@@ -551,12 +537,9 @@ const app = {
         const nameEl = document.getElementById('inp-name');
         const phoneEl = document.getElementById('inp-phone');
         let isValid = true;
-
         [nameEl, phoneEl].forEach(el => el.classList.remove('input-error'));
-
         if (!nameEl.value.trim()) { nameEl.classList.add('input-error'); isValid = false; }
         if (!phoneEl.value.trim()) { phoneEl.classList.add('input-error'); isValid = false; }
-
         if (!isValid) { alert("未入力の必須項目があります"); return; }
         
         app.toast("送信中...");
@@ -627,7 +610,7 @@ const app = {
             const el = document.querySelector(`input[name="tag"][value="${val}"]`);
             if(el) el.checked = false;
         }
-        app.resolveUrlAndRender(); // Re-render logic
+        app.resolveUrlAndRender();
     },
 
     updateModalChips: () => {
@@ -674,12 +657,12 @@ const app = {
         app.state.filter.category = cats;
         app.state.filter.tag = tags;
 
-        // If on Top, allow list navigation. If List, re-render.
-        if (window.location.search === '' || window.location.search === '?') { // Logic for Top Page
+        // Logic based on current view (if top, verify text; if list, re-render)
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get('page') && !params.get('id')) { // Top Page
              const btn = document.getElementById('top-condition-btn');
              if(btn) btn.innerHTML = (cats.length+tags.length) > 0 ? `<span>🔍 職種・こだわり (${cats.length+tags.length}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
         } else {
-             // List page re-render
              app.resolveUrlAndRender();
         }
         document.getElementById('condition-modal').classList.remove('active');
@@ -713,7 +696,6 @@ const app = {
         } else {
             app.state.filter.pref = p;
             app.closeRegionModal();
-            // Just verify we are on top or not to update text
             const display = document.getElementById('top-pref-display');
             if(display) {
                 display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
@@ -730,18 +712,87 @@ const app = {
     
     // ★★★ FIX: Use history.back() correctly ★★★
     back: () => { 
+        // If there is history, go back. Else, fallback.
         if(window.history.length > 1) {
             window.history.back();
         } else {
-            // Fallback if direct link
             const params = new URLSearchParams(window.location.search);
-            if(params.get('id')) app.router('list'); // From detail -> list
+            if(params.get('id')) app.router('list');
             else app.router('top');
         }
     },
     
+    renderMypage: (target) => {
+        if (!app.state.user) {
+            // Guest View (Keeps only)
+            const keepJobs = JOBS_DATA.filter(j => app.state.guestKeeps.includes(String(j.id)));
+            target.innerHTML = `
+                <div class="mypage-header">
+                    <h2 style="font-size:20px; font-weight:bold;">マイページ (ゲスト)</h2>
+                    <p style="font-size:12px; margin-top:8px;">ログインすると応募履歴も確認できます</p>
+                </div>
+                <div style="padding:0 16px;">
+                    <div class="mypage-tabs">
+                        <div class="mypage-tab active">キープ中 (${keepJobs.length})</div>
+                        <div class="mypage-tab" style="opacity:0.5;">応募履歴</div>
+                    </div>
+                    <div class="job-list">
+                        ${keepJobs.length ? keepJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">キープ中の求人はありません</p>'}
+                    </div>
+                </div>
+                <div class="container" style="padding:20px; text-align:center;">
+                    <button class="btn btn-primary" onclick="app.router('login')">ログインして機能を使う</button>
+                </div>
+            `;
+        } else {
+            // User View
+            const { userKeeps, user } = app.state;
+            const appliedIds = user.applied || [];
+            const isKeepTab = app.state.mypageTab === 'keep';
+            
+            const displayJobs = isKeepTab 
+                ? JOBS_DATA.filter(j => userKeeps.includes(String(j.id)))
+                : JOBS_DATA.filter(j => appliedIds.includes(String(j.id)));
+
+            target.innerHTML = `
+                <div class="mypage-header">
+                    <h2 style="font-size:20px; font-weight:bold;">${user.name} さんのマイページ</h2>
+                    <div style="margin-top:10px; font-size:12px; border:1px solid rgba(255,255,255,0.3); display:inline-block; padding:4px 10px; border-radius:15px; cursor:pointer;" onclick="app.logout()">ログアウト</div>
+                </div>
+                <div style="padding:0 16px;">
+                    <div class="mypage-tabs">
+                        <div class="mypage-tab ${isKeepTab?'active':''}" onclick="app.switchMypageTab('keep')">キープ中</div>
+                        <div class="mypage-tab ${!isKeepTab?'active':''}" onclick="app.switchMypageTab('history')">応募履歴</div>
+                    </div>
+                    <div class="job-list">
+                        ${displayJobs.length ? displayJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人はありません</p>'}
+                    </div>
+                </div>
+            `;
+        }
+    },
+
+    switchMypageTab: (tab) => {
+        app.state.mypageTab = tab;
+        app.renderMypage(document.getElementById('main-content'));
+    },
+
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); }
 };
 
 window.app = app;
+
+// ★★★ FIX: Event Listener OUTSIDE Init ★★★
+// This ensures it catches events regardless of timing
+window.addEventListener('popstate', () => {
+    app.resolveUrlAndRender();
+});
+
+// Backup for bfcache
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        app.resolveUrlAndRender();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', app.init);
