@@ -54,6 +54,9 @@ const ALL_CATEGORIES = [
 ];
 const TOP_CATEGORIES = ALL_CATEGORIES.slice(0, 8);
 
+// ★ 新規追加: 雇用形態 ★
+const EMP_TYPES = ["期間工", "派遣社員", "正社員", "アルバイト・パート", "契約社員"];
+
 const TAG_GROUPS = {
     "給与・特典": ["高収入", "日払い可", "週払い可", "入社祝い金あり", "ボーナスあり", "寮費無料", "交通費全額支給"],
     "勤務時間・休日": ["日勤のみ", "夜勤専属", "2交替", "3交替", "土日祝休み", "4勤2休", "残業少なめ", "短時間勤務OK"],
@@ -102,6 +105,7 @@ const generateJobs = (count) => {
         const shuffledTags = [...ALL_TAGS_FLAT].sort(() => 0.5 - Math.random());
         const myTags = shuffledTags.slice(0, Math.floor(Math.random() * 4) + 2);
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
+        const type = EMP_TYPES[i % EMP_TYPES.length]; // 雇用形態をランダムに
         data.push({
             id: i,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
@@ -111,7 +115,7 @@ const generateJobs = (count) => {
             salarySupp: "入社祝い金あり",
             monthlyIncome: `${Math.floor(hourly * 168 / 10000)}万円〜`,
             tags: [...new Set(myTags)],
-            type: i % 4 === 0 ? "期間工" : "派遣社員",
+            type: type, // 修正
             isNew: i <= 25,
             desc: `${pref}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
             flow: "8:00〜17:00 (実働8h)",
@@ -161,9 +165,11 @@ const parseCSV = (text) => {
 // --- App Core ---
 const app = {
     state: {
-        filter: { pref: '', tag: [], category: [], sort: 'new' },
+        filter: { pref: '', tag: [], category: [], sort: 'new', type: [] }, // typeフィルタ追加
         user: null,
+        userProfile: {}, // ユーザーの詳細プロフィール用
         guestKeeps: [],
+        guestApplied: [], // ゲストの応募履歴用
         mypageTab: 'keep'
     },
 
@@ -177,6 +183,10 @@ const app = {
         }
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
         if (savedGuestKeeps) app.state.guestKeeps = JSON.parse(savedGuestKeeps);
+        
+        // ★ ゲスト応募履歴読み込み
+        const savedGuestApplied = localStorage.getItem('factory_work_navi_guest_applied');
+        if (savedGuestApplied) app.state.guestApplied = JSON.parse(savedGuestApplied);
 
         // Auth
         onAuthStateChanged(auth, (user) => {
@@ -186,6 +196,7 @@ const app = {
             } else {
                 app.state.user = null;
                 app.state.userKeeps = [];
+                app.state.userProfile = {};
             }
             app.renderHeader();
             app.resolveUrlAndRender();
@@ -219,18 +230,14 @@ const app = {
         }
         document.getElementById('loading-overlay').style.display = 'none';
 
-        // ★★★ Fix: Initial Render ★★★
-        // Ensure the initial history state matches the URL
+        // Initial Render
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
         const page = params.get('page');
         window.history.replaceState({ id, page }, '', window.location.href);
-        
-        // Render current view
         app.resolveUrlAndRender();
     },
 
-    // ★★★ NEW CORE: URL-Based Router ★★★
     resolveUrlAndRender: () => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
@@ -253,11 +260,13 @@ const app = {
             app.renderAuthPage(container, 'register');
         } else if (page === 'form') {
             app.renderForm(container);
+        } else if (page === 'terms') {
+            app.renderTerms(container);
+        } else if (page === 'privacy') {
+            app.renderPrivacy(container);
         } else {
             app.renderTop(container);
         }
-        // Don't scroll on simple back navigation if possible, but for now scroll top is safer
-        // window.scrollTo(0, 0); 
     },
 
     router: (pageName, param = null) => {
@@ -273,7 +282,6 @@ const app = {
         const queryString = new URLSearchParams(query).toString();
         const newUrl = queryString ? `${url}?${queryString}` : url;
 
-        // Prevent pushing same state
         if (newUrl !== window.location.pathname + window.location.search) {
             window.history.pushState(query, '', newUrl);
         }
@@ -287,17 +295,18 @@ const app = {
         window.scrollTo(0, 0);
     },
 
-    // ... (Existing Functions: Sync, Renderers) ...
     syncUserKeeps: (uid) => {
         const userRef = doc(db, "users", uid);
         onSnapshot(userRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
+                app.state.userProfile = data; // ★ 全データを保持
                 app.state.userKeeps = data.keeps || [];
                 if(data.applied) app.state.user.applied = data.applied;
             } else {
                 setDoc(userRef, { keeps: [], applied: [], email: app.state.user.email }, { merge: true });
                 app.state.userKeeps = [];
+                app.state.userProfile = {};
             }
             app.resolveUrlAndRender(); 
             app.renderHeader();
@@ -321,6 +330,28 @@ const app = {
         }
     },
 
+    // ★ 利用規約ページ ★
+    renderTerms: (target) => {
+        target.innerHTML = `
+            <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">利用規約</div><div style="width:40px;"></div></div>
+            <div class="container" style="padding:20px;">
+                <h3>利用規約</h3>
+                <p style="margin-top:10px; color:#666; font-size:14px;">ここに利用規約の本文が入ります。</p>
+            </div>
+        `;
+    },
+
+    // ★ プライバシーポリシーページ ★
+    renderPrivacy: (target) => {
+        target.innerHTML = `
+            <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">プライバシーポリシー</div><div style="width:40px;"></div></div>
+            <div class="container" style="padding:20px;">
+                <h3>プライバシーポリシー</h3>
+                <p style="margin-top:10px; color:#666; font-size:14px;">ここにプライバシーポリシーの本文が入ります。</p>
+            </div>
+        `;
+    },
+
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
         target.innerHTML = `
@@ -336,14 +367,18 @@ const app = {
                 </div>
             </div>
             ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
+            
             <div class="section-title">職種から探す</div>
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
+            
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">こだわりをもっと見る</button></div>
+            
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
+            
             <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:40px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
                 <div style="font-size:12px; color:#666; margin-bottom:10px; display:flex; justify-content:center; gap:20px;">
                     <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
@@ -366,6 +401,7 @@ const app = {
                     <div class="job-card-title">${job.title}</div>
                     <div class="job-info-row"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
                     <div class="job-info-row"><span>📍</span> ${job.pref} &nbsp; <span>🏭</span> ${getCategoryName(job.category)}</div>
+                    <div class="job-info-row"><span>💼</span> ${job.type}</div>
                     <div style="margin-top:8px;">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
                     <div class="job-card-actions">
                         <button class="btn btn-outline btn-card" onclick="event.stopPropagation(); app.router('detail', ${job.id})">詳細</button>
@@ -398,7 +434,6 @@ const app = {
             localStorage.setItem('factory_work_navi_guest_keeps', JSON.stringify(app.state.guestKeeps));
             app.renderHeader();
             document.querySelectorAll(`.keep-btn-${id}`).forEach(b => b.classList.toggle('active'));
-            // Refresh if on MyPage
             if(window.location.search.includes('mypage')) app.resolveUrlAndRender();
         }
     },
@@ -408,19 +443,22 @@ const app = {
         const pref = prefText.includes('勤務地') ? '' : prefText.replace('▼','').replace('変更する >','').trim();
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
+        const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
         app.state.filter.pref = pref;
         app.state.filter.category = category;
         app.state.filter.tag = tag;
+        app.state.filter.type = type;
         app.router('list');
     },
 
     renderList: (target) => {
-        const { pref, sort, tag, category } = app.state.filter;
-        const createChipsHtml = (p, cList, tList) => {
+        const { pref, sort, tag, category, type } = app.state.filter;
+        const createChipsHtml = (p, cList, tList, tyList) => {
             let chips = [];
             if (p) chips.push(`<div class="filter-chip">📍 ${p} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('pref', '${p}')">×</div></div>`);
-            cList.forEach(c => chips.push(`<div class="filter-chip">🏭 ${getCategoryName(c)} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('category', '${c}')">×</div></div>`));
-            tList.forEach(t => chips.push(`<div class="filter-chip">🏷️ ${t} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('tag', '${t}')">×</div></div>`));
+            if(cList) cList.forEach(c => chips.push(`<div class="filter-chip">🏭 ${getCategoryName(c)} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('category', '${c}')">×</div></div>`));
+            if(tyList) tyList.forEach(t => chips.push(`<div class="filter-chip">💼 ${t} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('type', '${t}')">×</div></div>`));
+            if(tList) tList.forEach(t => chips.push(`<div class="filter-chip">🏷️ ${t} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('tag', '${t}')">×</div></div>`));
             return chips.length > 0 ? `<div class="active-filter-area"><span class="active-filter-label">条件:</span>${chips.join('')}</div>` : '';
         };
         
@@ -428,7 +466,7 @@ const app = {
             <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">求人検索</div><div style="width:40px;"></div></div>
             <div class="sticky-search-header">
                 <div class="filter-bar"><button class="filter-toggle-btn" onclick="app.openConditionModal()">⚡️ 条件を詳しく絞り込む</button></div>
-                <div id="chip-container">${createChipsHtml(pref, category, tag)}</div>
+                <div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div>
             </div>
             <div class="sort-area"><div id="result-count" class="result-count"></div><select id="sort-order" style="border:none; color:#666;" onchange="app.updateFilterSingle('sort', this.value)"><option value="new">新着順</option><option value="salary">給与順</option></select></div>
             <div id="list-container" class="job-list"></div>
@@ -439,11 +477,13 @@ const app = {
 
     renderListItems: () => {
         const container = document.getElementById('list-container');
-        const { pref, tag, category, sort } = app.state.filter;
+        const { pref, tag, category, sort, type } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
             if (pref && j.pref !== pref) return false;
-            if (tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
-            if (category.length > 0 && !category.includes(j.category)) return false;
+            if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
+            if (category && category.length > 0 && !category.includes(j.category)) return false;
+            // ★ 雇用形態フィルタ実装 ★
+            if (type && type.length > 0 && !type.includes(j.type)) return false;
             return true;
         });
         if(sort==='salary') res.sort((a,b)=>b.salaryVal-a.salaryVal); else res.sort((a,b)=>b.idNum-a.idNum);
@@ -458,7 +498,8 @@ const app = {
             return;
         }
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
-        const isApplied = app.state.user?.applied?.includes(String(job.id));
+        const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
+        const isApplied = appliedList.includes(String(job.id));
         
         target.innerHTML = `
             <div style="position:relative;">
@@ -515,31 +556,49 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
+    // ★★★ 応募フォーム (項目追加 & 自動入力) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
+        const p = app.state.userProfile || {}; // ユーザー情報
+
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">応募フォーム</div><div style="width:40px;"></div></div>
             <div style="padding:20px;">
                 <p class="mb-4 font-bold">${job ? job.title : ''}</p>
                 <div class="form-section">
                     <div class="form-section-title">応募者情報</div>
-                    <div class="form-group"><label class="form-label">お名前<span class="req">必須</span></label><input type="text" id="inp-name" class="form-input" value="${app.state.user ? app.state.user.name : ''}"></div>
-                    <div class="form-group"><label class="form-label">電話番号<span class="req">必須</span></label><input type="tel" id="inp-phone" class="form-input" value="${app.state.user ? app.state.user.tel || '' : ''}"></div>
-                    <div class="form-group"><label class="form-label">メールアドレス</label><input type="email" id="inp-email" class="form-input" value="${app.state.user ? app.state.user.email : ''}"></div>
+                    
+                    <div class="form-group"><label class="form-label">氏名<span class="req">必須</span></label><input type="text" id="inp-name" class="form-input" value="${p.name || ''}" placeholder="例：工場 太郎"></div>
+                    <div class="form-group"><label class="form-label">ふりがな<span class="req">必須</span></label><input type="text" id="inp-kana" class="form-input" value="${p.kana || ''}" placeholder="例：こうじょう たろう"></div>
+                    <div class="form-group"><label class="form-label">メールアドレス<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input type="email" id="inp-email" class="form-input" value="${p.email || ''}"></div>
+                    <div class="form-group"><label class="form-label">電話番号<span class="req">必須</span></label><input type="tel" id="inp-tel" class="form-input" value="${p.tel || ''}" placeholder="ハイフンなし"></div>
+                    <div class="form-group"><label class="form-label">生年月日<span class="req">必須</span></label><input type="date" id="inp-dob" class="form-input" value="${p.dob || ''}"></div>
+                    <div class="form-group"><label class="form-label">都道府県<span class="req">必須</span></label><select id="inp-pref" class="form-input"><option value="">選択してください</option>${PREFS.map(pr => `<option value="${pr}" ${p.pref===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
+                    <div class="form-group"><label class="form-label">町名・番地<span class="req">必須</span></label><input type="text" id="inp-city" class="form-input" value="${p.city || ''}" placeholder="例：〇〇市〇〇町1-2-3"></div>
+                    <div class="form-group"><label class="form-label">建物名・部屋番号<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input type="text" id="inp-bldg" class="form-input" value="${p.bldg || ''}"></div>
+                    <div class="form-group"><label class="form-label">性別<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label>
+                        <div class="radio-group">
+                            <label class="radio-label"><input type="radio" name="gender" value="male" ${p.gender==='male'?'checked':''}> 男性</label>
+                            <label class="radio-label"><input type="radio" name="gender" value="female" ${p.gender==='female'?'checked':''}> 女性</label>
+                        </div>
+                    </div>
+
                 </div>
                 <button class="btn btn-accent w-full" onclick="app.submitForm()">上記の内容で応募する</button>
             </div>`;
     },
 
     submitForm: async () => {
-        const nameEl = document.getElementById('inp-name');
-        const phoneEl = document.getElementById('inp-phone');
+        // バリデーション
+        const ids = ['inp-name', 'inp-kana', 'inp-tel', 'inp-dob', 'inp-pref', 'inp-city'];
         let isValid = true;
-        [nameEl, phoneEl].forEach(el => el.classList.remove('input-error'));
-        if (!nameEl.value.trim()) { nameEl.classList.add('input-error'); isValid = false; }
-        if (!phoneEl.value.trim()) { phoneEl.classList.add('input-error'); isValid = false; }
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            el.classList.remove('input-error');
+            if (!el.value.trim()) { el.classList.add('input-error'); isValid = false; }
+        });
         if (!isValid) { alert("未入力の必須項目があります"); return; }
         
         app.toast("送信中...");
@@ -548,15 +607,37 @@ const app = {
             const jobId = params.get('id');
             const job = JOBS_DATA.find(j => String(j.id) === String(jobId));
             const uid = app.state.user ? app.state.user.uid : "guest";
-            await addDoc(collection(db, "applications"), {
+            
+            const formData = {
                 jobId, jobTitle: job ? job.title : "Unknown", userId: uid,
-                userName: nameEl.value, userPhone: phoneEl.value, createdAt: serverTimestamp()
-            });
-            if (app.state.user) await updateDoc(doc(db, "users", uid), { applied: arrayUnion(jobId) });
-            alert("応募完了！"); app.router('list');
+                name: document.getElementById('inp-name').value,
+                kana: document.getElementById('inp-kana').value,
+                email: document.getElementById('inp-email').value,
+                tel: document.getElementById('inp-tel').value,
+                dob: document.getElementById('inp-dob').value,
+                pref: document.getElementById('inp-pref').value,
+                city: document.getElementById('inp-city').value,
+                bldg: document.getElementById('inp-bldg').value,
+                gender: document.querySelector('input[name="gender"]:checked')?.value || '',
+                createdAt: serverTimestamp()
+            };
+
+            await addDoc(collection(db, "applications"), formData);
+            
+            if (app.state.user) {
+                await updateDoc(doc(db, "users", uid), { applied: arrayUnion(jobId) });
+            } else {
+                // ゲスト用応募履歴保存
+                app.state.guestApplied.push(jobId);
+                localStorage.setItem('factory_work_navi_guest_applied', JSON.stringify(app.state.guestApplied));
+            }
+            
+            alert("応募ありがとうございます。担当のものよりメールかお電話にてご連絡いたします。");
+            app.router('list');
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
+    // ★★★ 会員登録フォーム (項目追加) ★★★
     renderAuthPage: (target, type) => {
         if(type === 'login') {
             target.innerHTML = `
@@ -568,34 +649,52 @@ const app = {
                     <p class="mt-4 text-center" onclick="app.router('register')">新規登録はこちら</p>
                 </div>`;
         } else {
-            const yearOpts = Array.from({length: 50}, (_, i) => 2005 - i).map(y => `<option value="${y}">${y}年</option>`).join('');
-            const monthOpts = Array.from({length: 12}, (_, i) => i + 1).map(m => `<option value="${m}">${m}月</option>`).join('');
-            const dayOpts = Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}">${d}日</option>`).join('');
             target.innerHTML = `
                 <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">無料会員登録</div><div style="width:40px;"></div></div>
                 <div class="container" style="padding:16px;">
                     <div class="form-section">
                         <div class="form-section-title">基本情報</div>
-                        <div class="form-group"><label class="form-label">お名前<span class="req">必須</span></label><input id="reg-name" class="form-input" placeholder="例：工場 太郎"></div>
-                        <div class="form-group"><label class="form-label">生年月日<span class="req">必須</span></label><div style="display:flex; gap:8px;"><select id="reg-year" class="form-input">${yearOpts}</select><select id="reg-month" class="form-input">${monthOpts}</select><select id="reg-day" class="form-input">${dayOpts}</select></div></div>
-                        <div class="form-group"><label class="form-label">性別</label><div class="radio-group"><label class="radio-label"><input type="radio" name="gender" value="male" checked> 男性</label><label class="radio-label"><input type="radio" name="gender" value="female"> 女性</label></div></div>
+                        <div class="form-group"><label class="form-label">氏名<span class="req">必須</span></label><input id="reg-name" class="form-input" placeholder="例：工場 太郎"></div>
+                        <div class="form-group"><label class="form-label">ふりがな<span class="req">必須</span></label><input id="reg-kana" class="form-input" placeholder="例：こうじょう たろう"></div>
+                        <div class="form-group"><label class="form-label">生年月日<span class="req">必須</span></label><input type="date" id="reg-dob" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">都道府県<span class="req">必須</span></label><select id="reg-pref" class="form-input"><option value="">選択してください</option>${PREFS.map(p => `<option value="${p}">${p}</option>`).join('')}</select></div>
+                        <div class="form-group"><label class="form-label">町名・番地<span class="req">必須</span></label><input id="reg-city" class="form-input" placeholder="例：〇〇市〇〇町1-2-3"></div>
+                        <div class="form-group"><label class="form-label">建物名・部屋番号<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input id="reg-bldg" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">性別<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><div class="radio-group"><label class="radio-label"><input type="radio" name="gender" value="male" checked> 男性</label><label class="radio-label"><input type="radio" name="gender" value="female"> 女性</label></div></div>
                     </div>
-                    <div class="form-section"><div class="form-section-title">連絡先・ログイン情報</div><div class="form-group"><label class="form-label">電話番号<span class="req">必須</span></label><input id="reg-tel" type="tel" class="form-input" placeholder="09012345678"></div><div class="form-group"><label class="form-label">メールアドレス<span class="req">必須</span></label><input id="reg-email" type="email" class="form-input" placeholder="sample@example.com"></div><div class="form-group"><label class="form-label">パスワード<span class="req">必須</span></label><input id="reg-pass" type="password" class="form-input" placeholder="8文字以上"></div></div>
+                    <div class="form-section"><div class="form-section-title">連絡先・ログイン情報</div>
+                        <div class="form-group"><label class="form-label">電話番号<span class="req">必須</span></label><input id="reg-tel" type="tel" class="form-input" placeholder="ハイフンなし"></div>
+                        <div class="form-group"><label class="form-label">メールアドレス<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input id="reg-email" type="email" class="form-input" placeholder="sample@example.com"></div>
+                        <div class="form-group"><label class="form-label">パスワード<span class="req">必須</span></label><input id="reg-pass" type="password" class="form-input" placeholder="8文字以上"></div>
+                    </div>
                     <button class="btn btn-register w-full" onclick="app.validateAndRegister()">登録してはじめる</button>
                 </div>`;
         }
     },
 
     validateAndRegister: () => {
-        const reqIds = ['reg-name', 'reg-tel', 'reg-email', 'reg-pass'];
+        const ids = ['reg-name', 'reg-kana', 'reg-dob', 'reg-pref', 'reg-city', 'reg-tel', 'reg-pass'];
         let isValid = true;
-        reqIds.forEach(id => {
+        ids.forEach(id => {
             const el = document.getElementById(id);
             el.classList.remove('input-error');
             if(!el.value.trim()) { el.classList.add('input-error'); isValid = false; }
         });
         if(!isValid) { alert("未入力の必須項目があります"); return; }
-        app.register(app.getRegisterData());
+        
+        const data = {
+            name: document.getElementById('reg-name').value,
+            kana: document.getElementById('reg-kana').value,
+            dob: document.getElementById('reg-dob').value,
+            pref: document.getElementById('reg-pref').value,
+            city: document.getElementById('reg-city').value,
+            bldg: document.getElementById('reg-bldg').value,
+            tel: document.getElementById('reg-tel').value,
+            email: document.getElementById('reg-email').value,
+            password: document.getElementById('reg-pass').value,
+            gender: document.querySelector('input[name="gender"]:checked')?.value || ''
+        };
+        app.register(data);
     },
 
     removeFilter: (type, val) => {
@@ -610,15 +709,22 @@ const app = {
             const el = document.querySelector(`input[name="tag"][value="${val}"]`);
             if(el) el.checked = false;
         }
+        else if (type === 'type') { // 雇用形態解除
+            app.state.filter.type = app.state.filter.type.filter(t => t !== val);
+            const el = document.querySelector(`input[name="top-type"][value="${val}"]`);
+            if(el) el.checked = false;
+        }
         app.resolveUrlAndRender();
     },
 
     updateModalChips: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => ({val: c.value, label: getCategoryName(c.value)}));
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => ({val: t.value, label: t.value}));
+        const types = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => ({val: t.value, label: t.value}));
         const container = document.getElementById('modal-active-chips');
         let html = '';
         cats.forEach(c => html += `<div class="filter-chip">🏭 ${c.label}</div>`);
+        types.forEach(t => html += `<div class="filter-chip">💼 ${t.label}</div>`);
         tags.forEach(t => html += `<div class="filter-chip">🏷️ ${t.label}</div>`);
         container.innerHTML = html;
     },
@@ -628,6 +734,7 @@ const app = {
         const body = document.getElementById('condition-modal-body');
         const currentCats = app.state.filter.category || [];
         const currentTags = app.state.filter.tag || [];
+        const currentTypes = app.state.filter.type || [];
         
         let tagsHtml = "";
         for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
@@ -644,7 +751,15 @@ const app = {
             </div>
         `;
 
-        body.innerHTML = `${prefHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${tagsHtml}`;
+        // ★ 雇用形態セクション追加 ★
+        const typeHtml = `
+            <div class="cond-section">
+                <div class="cond-head"><span class="cond-icon">💼</span>雇用形態</div>
+                <div class="cond-grid-modern">${EMP_TYPES.map(t => `<label class="check-btn"><input type="checkbox" name="top-type" value="${t}" ${currentTypes.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div>
+            </div>
+        `;
+
+        body.innerHTML = `${prefHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${typeHtml}${tagsHtml}`;
         modal.classList.add('active');
         app.updateModalChips();
     },
@@ -652,16 +767,17 @@ const app = {
     closeConditionModal: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
+        const types = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
         
-        // Save filters
         app.state.filter.category = cats;
         app.state.filter.tag = tags;
+        app.state.filter.type = types;
 
-        // Logic based on current view (if top, verify text; if list, re-render)
         const params = new URLSearchParams(window.location.search);
-        if (!params.get('page') && !params.get('id')) { // Top Page
+        if (!params.get('page') && !params.get('id')) {
              const btn = document.getElementById('top-condition-btn');
-             if(btn) btn.innerHTML = (cats.length+tags.length) > 0 ? `<span>🔍 職種・こだわり (${cats.length+tags.length}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
+             const total = cats.length + tags.length + types.length;
+             if(btn) btn.innerHTML = total > 0 ? `<span>🔍 職種・こだわり (${total}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
         } else {
              app.resolveUrlAndRender();
         }
@@ -707,12 +823,23 @@ const app = {
 
     login: async (email, pass) => { app.toast("ログイン中..."); try { await signInWithEmailAndPassword(auth, email, pass); app.toast("ログインしました"); app.router('top'); } catch (error) { console.error(error); alert("ログイン失敗: " + error.message); } },
     logout: async () => { await signOut(auth); app.toast("ログアウトしました"); app.router('top'); },
-    register: async (d) => { try { const u = await createUserWithEmailAndPassword(auth, d.email, d.password); await updateProfile(u.user, { displayName: d.name }); await setDoc(doc(db, "users", u.user.uid), { name: d.name, email: d.email, keeps: [], applied: [], createdAt: serverTimestamp() }); app.toast("登録完了！"); app.router('top'); } catch (e) { console.error(e); alert("登録エラー: " + e.message); } },
-    getRegisterData: () => ({ name: document.getElementById('reg-name').value, email: document.getElementById('reg-email').value, password: document.getElementById('reg-pass').value }),
     
-    // ★★★ FIX: Use history.back() correctly ★★★
+    // ★ 登録時に全項目保存 ★
+    register: async (d) => { 
+        try { 
+            const u = await createUserWithEmailAndPassword(auth, d.email, d.password); 
+            await updateProfile(u.user, { displayName: d.name }); 
+            // 詳細プロフィールを保存
+            await setDoc(doc(db, "users", u.user.uid), { 
+                ...d, // 全項目保存
+                keeps: [], applied: [], createdAt: serverTimestamp() 
+            }); 
+            app.toast("登録完了！"); 
+            app.router('top'); 
+        } catch (e) { console.error(e); alert("登録エラー: " + e.message); } 
+    },
+    
     back: () => { 
-        // If there is history, go back. Else, fallback.
         if(window.history.length > 1) {
             window.history.back();
         } else {
@@ -722,22 +849,27 @@ const app = {
         }
     },
     
+    // ★ マイページ (ゲスト対応) ★
     renderMypage: (target) => {
         if (!app.state.user) {
-            // Guest View (Keeps only)
+            // ゲスト: LocalStorageから読み込み
             const keepJobs = JOBS_DATA.filter(j => app.state.guestKeeps.includes(String(j.id)));
+            const appliedJobs = JOBS_DATA.filter(j => app.state.guestApplied.includes(String(j.id)));
+            const isKeepTab = app.state.mypageTab === 'keep';
+            const displayJobs = isKeepTab ? keepJobs : appliedJobs;
+
             target.innerHTML = `
                 <div class="mypage-header">
                     <h2 style="font-size:20px; font-weight:bold;">マイページ (ゲスト)</h2>
-                    <p style="font-size:12px; margin-top:8px;">ログインすると応募履歴も確認できます</p>
+                    <p style="font-size:12px; margin-top:8px;">ログインすると履歴を保存できます</p>
                 </div>
                 <div style="padding:0 16px;">
                     <div class="mypage-tabs">
-                        <div class="mypage-tab active">キープ中 (${keepJobs.length})</div>
-                        <div class="mypage-tab" style="opacity:0.5;">応募履歴</div>
+                        <div class="mypage-tab ${isKeepTab?'active':''}" onclick="app.switchMypageTab('keep')">キープ中 (${keepJobs.length})</div>
+                        <div class="mypage-tab ${!isKeepTab?'active':''}" onclick="app.switchMypageTab('history')">応募履歴 (${appliedJobs.length})</div>
                     </div>
                     <div class="job-list">
-                        ${keepJobs.length ? keepJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">キープ中の求人はありません</p>'}
+                        ${displayJobs.length ? displayJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人はありません</p>'}
                     </div>
                 </div>
                 <div class="container" style="padding:20px; text-align:center;">
@@ -745,11 +877,10 @@ const app = {
                 </div>
             `;
         } else {
-            // User View
+            // 会員
             const { userKeeps, user } = app.state;
             const appliedIds = user.applied || [];
             const isKeepTab = app.state.mypageTab === 'keep';
-            
             const displayJobs = isKeepTab 
                 ? JOBS_DATA.filter(j => userKeeps.includes(String(j.id)))
                 : JOBS_DATA.filter(j => appliedIds.includes(String(j.id)));
@@ -782,13 +913,10 @@ const app = {
 
 window.app = app;
 
-// ★★★ FIX: Event Listener OUTSIDE Init ★★★
-// This ensures it catches events regardless of timing
 window.addEventListener('popstate', () => {
     app.resolveUrlAndRender();
 });
 
-// Backup for bfcache
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
         app.resolveUrlAndRender();
