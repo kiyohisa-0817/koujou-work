@@ -75,7 +75,6 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
-// --- Utils ---
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
@@ -95,7 +94,6 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
-// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
     for (let i = 1; i <= count; i++) {
@@ -173,6 +171,18 @@ const app = {
     },
 
     init: async () => {
+        // ★★★ モーダル初期化を最優先で実行 ★★★
+        if(!document.getElementById('condition-modal')) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
+            `);
+        }
+        if(!document.getElementById('region-modal')) {
+            document.body.insertAdjacentHTML('beforeend', `
+                <div id="region-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span id="modal-title">勤務地を選択</span><button class="modal-close" onclick="window.app.closeRegionModal()">×</button></div><div class="modal-body" id="modal-body"></div></div></div>
+            `);
+        }
+
         const savedState = sessionStorage.getItem('fwn_state');
         if (savedState) {
             const parsed = JSON.parse(savedState);
@@ -197,18 +207,6 @@ const app = {
             app.renderHeader();
             app.resolveUrlAndRender();
         });
-
-        // Initialize Modals
-        if(!document.getElementById('condition-modal')) {
-            document.body.insertAdjacentHTML('beforeend', `
-                <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
-            `);
-        }
-        if(!document.getElementById('region-modal')) {
-            document.body.insertAdjacentHTML('beforeend', `
-                <div id="region-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span id="modal-title">勤務地を選択</span><button class="modal-close" onclick="window.app.closeRegionModal()">×</button></div><div class="modal-body" id="modal-body"></div></div></div>
-            `);
-        }
 
         app.renderHeader();
 
@@ -419,19 +417,19 @@ const app = {
                 <p>全国からあなたにぴったりの職場を見つけよう！</p>
                 <div class="search-box">
                     <div class="search-input-area">
-                        <button class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
-                        <button class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()">職種・こだわり条件を選択<span>▼</span></button>
+                        <button type="button" class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
+                        <button type="button" class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()">職種・こだわり条件を選択<span>▼</span></button>
                     </div>
-                    <button class="btn-search" onclick="app.handleTopSearch()">検索</button>
+                    <button type="button" class="btn-search" onclick="app.handleTopSearch()">検索</button>
                 </div>
             </div>
             ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
             <div class="section-title">職種から探す</div>
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.selectCategoryAndOpenModal('${c.id}')"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
-            <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
+            <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
-            <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">こだわりをもっと見る</button></div>
+            <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal()">こだわりをもっと見る</button></div>
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
             <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:40px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
@@ -523,7 +521,7 @@ const app = {
         };
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">求人検索</div><div style="width:40px;"></div></div>
-            <div class="sticky-search-header"><div class="filter-bar"><button class="filter-toggle-btn" onclick="app.openConditionModal()">⚡️ 条件を詳しく絞り込む</button></div><div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div></div>
+            <div class="sticky-search-header"><div class="filter-bar"><button type="button" class="filter-toggle-btn" onclick="app.openConditionModal()">⚡️ 条件を詳しく絞り込む</button></div><div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div></div>
             <div class="sort-area"><div id="result-count" class="result-count"></div><select id="sort-order" style="border:none; color:#666;" onchange="app.updateFilterSingle('sort', this.value)"><option value="new">新着順</option><option value="salary">給与順</option></select></div>
             <div id="list-container" class="job-list"></div>`;
         document.getElementById('sort-order').value = sort;
@@ -590,13 +588,13 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
+    // ★★★ 応募フォーム (完了メッセージ変更 & バリデーション強化) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         const p = app.state.userProfile || {}; 
 
-        // 年・月・日生成
         const currentYear = new Date().getFullYear();
         const years = Array.from({length: 60}, (_, i) => currentYear - 16 - i).map(y => `<option value="${y}">${y}年</option>`).join('');
         const months = Array.from({length: 12}, (_, i) => i + 1).map(m => `<option value="${String(m).padStart(2,'0')}">${m}月</option>`).join('');
@@ -635,7 +633,7 @@ const app = {
                     <br>に同意して
                 </div>
                 
-                <button class="btn btn-accent w-full" onclick="app.submitForm()">応募する</button>
+                <button class="btn btn-accent w-full" onclick="app.submitForm()">下記利用規約・プライバシーポリシーに同意して応募する</button>
             </div>`;
         
         app.restoreFormData();
@@ -654,7 +652,7 @@ const app = {
     },
 
     submitForm: async () => {
-        // ★★★ バリデーション強化 & スクロール ★★★
+        // ★★★ バリデーション & 自動スクロール & メッセージ表示 ★★★
         const requiredIds = ['inp-name', 'inp-kana', 'inp-tel', 'inp-pref', 'inp-city'];
         const y = document.getElementById('inp-dob-y').value;
         const m = document.getElementById('inp-dob-m').value;
@@ -719,7 +717,6 @@ const app = {
             app.sendToGas(formData);
             sessionStorage.removeItem('temp_form_data');
             
-            // ★★★ 完了メッセージの変更 ★★★
             alert("応募が完了しました。詳細につきまして担当のものからメールかお電話にてご連絡させていただきます。");
             app.router('list');
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
@@ -938,10 +935,129 @@ const app = {
         app.renderMypage(document.getElementById('main-content'));
     },
 
-    toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); }
+    toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); },
+
+    // ★★★ 重要：モーダル閉じる処理 ★★★
+    closeConditionModal: () => {
+        const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
+        const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
+        const types = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
+        
+        app.state.filter.category = cats;
+        app.state.filter.tag = tags;
+        app.state.filter.type = types;
+
+        // ボタンの表示更新（Topページのみ）
+        const btn = document.getElementById('top-condition-btn');
+        if(btn) {
+             const total = cats.length + tags.length + types.length;
+             btn.innerHTML = total > 0 ? `<span>🔍 職種・こだわり (${total}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
+        }
+        
+        // リスト画面なら再検索
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('page') === 'list') {
+             app.resolveUrlAndRender();
+        }
+        document.getElementById('condition-modal').classList.remove('active');
+    },
+    
+    closeRegionModal: () => document.getElementById('region-modal').classList.remove('active'),
+    
+    openRegionModal: () => { 
+        document.getElementById('region-modal').classList.add('active'); 
+        app.renderRegionStep1(); 
+    },
+    
+    renderRegionStep1: () => { 
+        document.getElementById('modal-title').innerText = "勤務地を選択"; 
+        document.getElementById('modal-body').innerHTML = `<div class="region-grid">${REGIONS.map((r, i) => `<div class="region-btn" onclick="app.renderRegionStep2(${i})"><span class="icon">${r.icon}</span><span>${r.name}</span></div>`).join('')}</div>`; 
+    },
+    
+    renderRegionStep2: (idx) => { 
+        const r = REGIONS[idx]; 
+        document.getElementById('modal-title').innerText = r.name; 
+        document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.selectPref('${p}')">${p}</div>`).join('')}</div>`; 
+    },
+    
+    selectPref: (p) => {
+        app.state.filter.pref = p;
+        app.closeRegionModal();
+        const display = document.getElementById('top-pref-display');
+        if(display) {
+            display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
+        }
+        // リスト画面なら再検索
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('page') === 'list') {
+             app.resolveUrlAndRender();
+        }
+    },
+    
+    removeFilter: (type, val) => {
+        if (type === 'pref') app.state.filter.pref = '';
+        else if (type === 'category') {
+            app.state.filter.category = app.state.filter.category.filter(c => c !== val);
+        }
+        else if (type === 'tag') {
+            app.state.filter.tag = app.state.filter.tag.filter(t => t !== val);
+        }
+        else if (type === 'type') {
+            app.state.filter.type = app.state.filter.type.filter(t => t !== val);
+        }
+        app.resolveUrlAndRender();
+    },
+
+    updateModalChips: () => {
+        const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => ({val: c.value, label: getCategoryName(c.value)}));
+        const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => ({val: t.value, label: t.value}));
+        const types = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => ({val: t.value, label: t.value}));
+        const container = document.getElementById('modal-active-chips');
+        let html = '';
+        cats.forEach(c => html += `<div class="filter-chip">🏭 ${c.label}</div>`);
+        types.forEach(t => html += `<div class="filter-chip">💼 ${t.label}</div>`);
+        tags.forEach(t => html += `<div class="filter-chip">🏷️ ${t.label}</div>`);
+        container.innerHTML = html;
+    },
+
+    openConditionModal: () => {
+        const modal = document.getElementById('condition-modal');
+        const body = document.getElementById('condition-modal-body');
+        const currentCats = app.state.filter.category || [];
+        const currentTags = app.state.filter.tag || [];
+        const currentTypes = app.state.filter.type || [];
+        
+        let tagsHtml = "";
+        for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
+            tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
+        }
+        
+        const currentPref = app.state.filter.pref || '';
+        const prefHtml = `
+            <div class="cond-section">
+                <div class="cond-head"><span class="cond-icon">📍</span>都道府県</div>
+                <div style="background:#f9f9f9; padding:12px; border-radius:8px; text-align:center; font-weight:bold; color:#555; cursor:pointer;" onclick="app.openRegionModal()">
+                    ${currentPref || '選択されていません'} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>
+                </div>
+            </div>
+        `;
+
+        const typeHtml = `
+            <div class="cond-section">
+                <div class="cond-head"><span class="cond-icon">💼</span>雇用形態</div>
+                <div class="cond-grid-modern">${EMP_TYPES.map(t => `<label class="check-btn"><input type="checkbox" name="top-type" value="${t}" ${currentTypes.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div>
+            </div>
+        `;
+
+        body.innerHTML = `${prefHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${typeHtml}${tagsHtml}`;
+        modal.classList.add('active');
+        app.updateModalChips();
+    },
+
+    updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.resolveUrlAndRender(); }
 };
 
-// ★★★ IMPORTANT: Ensure 'app' is globally available immediately ★★★
+// ★★★ IMPORTANT: Define global app reference immediately ★★★
 window.app = app;
 
 window.addEventListener('popstate', () => {
