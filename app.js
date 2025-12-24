@@ -1,3 +1,4 @@
+// ... (Firebase Import等は変更なし) ...
 // ===============================================
 // Firebase Integration
 // ===============================================
@@ -37,9 +38,7 @@ const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
 
-// ===============================================
-// Config & Constants
-// ===============================================
+// ... (定数定義、generateJobs, parseCSV関数などは変更なし) ...
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRdK1TXUJlZll4AbgNAoU33X3JiMJek8Z8ZpQhALxBCC3T7nfnN211M7TeS7tTfVW/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
 
@@ -73,7 +72,6 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
-// --- Utils ---
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
@@ -93,7 +91,6 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
-// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
     for (let i = 1; i <= count; i++) {
@@ -158,24 +155,21 @@ const parseCSV = (text) => {
     return jobs;
 };
 
-// --- App ---
+// --- App Core ---
 const app = {
     state: {
-        page: 'top',
-        detailId: null,
+        // "Page" variables removed. We rely on URL now.
         filter: { pref: '', tag: [], category: [], sort: 'new' },
         user: null,
         guestKeeps: [],
-        mypageTab: 'keep',
-        currentUrl: window.location.href // ★ Track URL
+        mypageTab: 'keep'
     },
 
     init: async () => {
+        // Load saved settings
         const savedState = sessionStorage.getItem('fwn_state');
         if (savedState) {
             const parsed = JSON.parse(savedState);
-            app.state.page = parsed.page;
-            app.state.detailId = parsed.detailId;
             app.state.filter = parsed.filter || app.state.filter;
             app.state.mypageTab = parsed.mypageTab || 'keep';
         }
@@ -183,6 +177,7 @@ const app = {
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
         if (savedGuestKeeps) app.state.guestKeeps = JSON.parse(savedGuestKeeps);
 
+        // Auth Logic
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 app.state.user = { uid: user.uid, email: user.email, name: user.displayName || "ゲスト" };
@@ -192,59 +187,23 @@ const app = {
                 app.state.userKeeps = [];
             }
             app.renderHeader();
-            // Load based on URL initially
-            const currentParams = new URLSearchParams(window.location.search);
-            const currentId = currentParams.get('id');
-            if(currentId) {
-                app.router('detail', parseInt(currentId), false);
-            } else {
-                app.router(app.state.page || 'top', app.state.detailId, false);
-            }
+            // ★ Force Render on Auth Change based on CURRENT URL
+            app.resolveUrlAndRender();
         });
 
-        // Initialize Modals if not present
+        // Initialize Modals
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
-                <div id="condition-modal" class="modal-overlay">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <span>詳細条件を設定</span>
-                            <button class="modal-close" onclick="app.closeConditionModal()">×</button>
-                        </div>
-                        <div id="modal-active-chips" class="modal-chip-bar"></div>
-                        <div class="modal-body" id="condition-modal-body"></div>
-                        <div class="modal-footer">
-                            <button class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button>
-                        </div>
-                    </div>
-                </div>
+                <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
             `);
         }
         if(!document.getElementById('region-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
-                <div id="region-modal" class="modal-overlay">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <span id="modal-title">勤務地を選択</span>
-                            <button class="modal-close" onclick="window.app.closeRegionModal()">×</button>
-                        </div>
-                        <div class="modal-body" id="modal-body"></div>
-                    </div>
-                </div>
+                <div id="region-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span id="modal-title">勤務地を選択</span><button class="modal-close" onclick="window.app.closeRegionModal()">×</button></div><div class="modal-body" id="modal-body"></div></div></div>
             `);
         }
 
         app.renderHeader();
-
-        // Initialize state
-        app.state.currentUrl = window.location.href;
-        const initialParams = new URLSearchParams(window.location.search);
-        const initialId = initialParams.get('id');
-        const initialState = {
-            page: initialId ? 'detail' : 'top',
-            id: initialId ? parseInt(initialId) : null
-        };
-        window.history.replaceState(initialState, '', window.location.href);
 
         // Load Data
         if (GOOGLE_SHEET_CSV_URL) {
@@ -260,28 +219,68 @@ const app = {
         }
         document.getElementById('loading-overlay').style.display = 'none';
 
-        // ★★★ FIX: Polling Interval to catch URL changes (The "Safety Net") ★★★
-        setInterval(() => {
-            if (window.location.href !== app.state.currentUrl) {
-                app.state.currentUrl = window.location.href;
-                const params = new URLSearchParams(window.location.search);
-                const id = params.get('id');
-                
-                if (id) {
-                    app.router('detail', parseInt(id), false); // Don't push, just render
-                } else {
-                    // Back to root/list
-                    // We try to respect the history state if it exists, otherwise default to top
-                    if (window.history.state && window.history.state.page) {
-                        app.router(window.history.state.page, window.history.state.id, false);
-                    } else {
-                        app.router('top', null, false);
-                    }
-                }
-            }
-        }, 200); // Check every 200ms
+        // ★★★ FIX: Initial Render based on URL ★★★
+        app.resolveUrlAndRender();
+
+        // ★★★ FIX: Robust Popstate Handler (Source of Truth is URL) ★★★
+        window.onpopstate = () => {
+            app.resolveUrlAndRender();
+        };
     },
 
+    // ★★★ NEW CORE FUNCTION: Decides what to show based on URL ★★★
+    resolveUrlAndRender: () => {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        const page = params.get('page'); // Support ?page=mypage, ?page=list
+
+        const container = document.getElementById('main-content');
+        container.innerHTML = ''; // Clear content first
+
+        if (id) {
+            app.renderDetail(container, parseInt(id));
+        } else if (page === 'list') {
+            app.renderList(container);
+        } else if (page === 'mypage') {
+            app.renderMypage(container);
+        } else if (page === 'login') {
+            app.renderAuthPage(container, 'login');
+        } else if (page === 'register') {
+            app.renderAuthPage(container, 'register');
+        } else if (page === 'form') {
+            app.renderForm(container);
+        } else {
+            // Default to Top
+            app.renderTop(container);
+        }
+        window.scrollTo(0, 0);
+    },
+
+    // ★★★ FIX: Router only updates URL, then calls Resolve ★★★
+    router: (pageName, param = null) => {
+        let newUrl = window.location.pathname;
+        
+        if (pageName === 'detail' && param) {
+            newUrl += `?id=${param}`;
+        } else if (pageName !== 'top') {
+            newUrl += `?page=${pageName}`;
+        }
+        // If top, newUrl is just pathname (root)
+
+        // Push state to browser history
+        window.history.pushState({}, '', newUrl);
+        
+        // Save filter state manually since we don't put it in URL
+        sessionStorage.setItem('fwn_state', JSON.stringify({
+            filter: app.state.filter,
+            mypageTab: app.state.mypageTab
+        }));
+
+        // Render immediately
+        app.resolveUrlAndRender();
+    },
+
+    // ... (SyncUserKeeps - No Change) ...
     syncUserKeeps: (uid) => {
         const userRef = doc(db, "users", uid);
         onSnapshot(userRef, (docSnap) => {
@@ -293,46 +292,13 @@ const app = {
                 setDoc(userRef, { keeps: [], applied: [], email: app.state.user.email }, { merge: true });
                 app.state.userKeeps = [];
             }
-            if (app.state.page === 'list') app.renderList(document.getElementById('main-content'));
-            if (app.state.page === 'detail') app.renderDetail(document.getElementById('main-content'), app.state.detailId);
-            if (app.state.page === 'mypage') app.renderMypage(document.getElementById('main-content'));
+            // Re-render current view to reflect keep status changes
+            app.resolveUrlAndRender(); 
             app.renderHeader();
         });
     },
 
-    saveState: () => sessionStorage.setItem('fwn_state', JSON.stringify(app.state)),
-
-    router: (pageName, param = null, addHistory = true) => {
-        window.scrollTo(0, 0);
-        app.state.page = pageName;
-        if(pageName === 'detail') app.state.detailId = param;
-        app.saveState();
-
-        if (addHistory) {
-            const newUrl = (pageName === 'detail' && param) ? `${window.location.pathname}?id=${param}` : window.location.pathname;
-            window.history.pushState({page: pageName, id: param}, '', newUrl);
-            app.state.currentUrl = window.location.href; // Update currentUrl immediately so poller doesn't double-fire
-        }
-        
-        const container = document.getElementById('main-content');
-        if (pageName === 'top') { container.innerHTML = ''; app.renderTop(container); }
-        else if (pageName === 'list') {
-            if (param && param.fromTop) {
-                app.state.filter.pref = param.pref || '';
-                app.state.filter.tag = param.tag || [];
-                app.state.filter.category = param.category || [];
-            }
-            container.innerHTML = ''; 
-            app.renderList(container);
-        }
-        else if (pageName === 'detail') { container.innerHTML = ''; app.renderDetail(container, app.state.detailId); }
-        else if (pageName === 'register' || pageName === 'login') { container.innerHTML = ''; app.renderAuthPage(container, pageName); }
-        else if (pageName === 'form') { container.innerHTML = ''; app.renderForm(container); }
-        else if (pageName === 'mypage') { container.innerHTML = ''; app.renderMypage(container); }
-        else if (pageName === 'privacy') { container.innerHTML = ''; app.renderPrivacy(container); }
-        else if (pageName === 'terms') { container.innerHTML = ''; app.renderTerms(container); }
-    },
-
+    // ... (Render Header/Top - No Change) ...
     renderHeader: () => {
         const area = document.getElementById('header-nav-area');
         const logo = document.querySelector('.logo');
@@ -346,7 +312,6 @@ const app = {
         if (app.state.user) {
             area.innerHTML = `<div class="header-btn-icon" onclick="app.router('mypage')"><span class="icon">👤</span>マイページ${badgeHtml}</div><div class="header-btn-icon" onclick="app.router('list')"><span class="icon">🔍</span>さがす</div>`;
         } else {
-            // Heart icon routes to mypage for guest keeps as well
             area.innerHTML = `<div class="header-btn-icon" onclick="app.router('mypage')"><span class="icon" style="color:#e91e63;">♥</span>キープ${badgeHtml}</div><span class="header-login-link" onclick="app.router('login')">ログイン</span><button class="btn-register-header" onclick="app.router('register')">無料会員登録</button>`;
         }
     },
@@ -432,7 +397,8 @@ const app = {
             localStorage.setItem('factory_work_navi_guest_keeps', JSON.stringify(app.state.guestKeeps));
             app.renderHeader();
             document.querySelectorAll(`.keep-btn-${id}`).forEach(b => b.classList.toggle('active'));
-            if(app.state.page === 'mypage') app.renderMypage(document.getElementById('main-content'));
+            // Refresh view if needed
+            if(window.location.search.includes('mypage')) app.resolveUrlAndRender();
         }
     },
 
@@ -441,7 +407,11 @@ const app = {
         const pref = prefText.includes('勤務地') ? '' : prefText.replace('▼','').replace('変更する >','').trim();
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
-        app.router('list', { fromTop: true, pref, category, tag });
+        // Note: We handle passing filters via state, router just goes to list page
+        app.state.filter.pref = pref;
+        app.state.filter.category = category;
+        app.state.filter.tag = tag;
+        app.router('list');
     },
 
     renderList: (target) => {
@@ -482,8 +452,12 @@ const app = {
     },
 
     renderDetail: (target, id) => {
+        // Need to ensure ID is string/number match
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
-        if (!job) return;
+        if (!job) {
+            target.innerHTML = '<p class="text-center mt-4">求人が見つかりません</p>';
+            return;
+        }
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         const isApplied = app.state.user?.applied?.includes(String(job.id));
         
@@ -556,7 +530,9 @@ const app = {
     },
 
     renderForm: (target) => {
-        const job = JOBS_DATA.find(j => String(j.id) === String(app.state.detailId));
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id') || app.state.detailId; // fallback logic if simple reload
+        const job = JOBS_DATA.find(j => String(j.id) === String(id));
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">応募フォーム</div><div style="width:40px;"></div></div>
             <div style="padding:20px;">
@@ -585,8 +561,9 @@ const app = {
         
         app.toast("送信中...");
         try {
-            const jobId = String(app.state.detailId);
-            const job = JOBS_DATA.find(j => String(j.id) === jobId);
+            const params = new URLSearchParams(window.location.search);
+            const jobId = params.get('id');
+            const job = JOBS_DATA.find(j => String(j.id) === String(jobId));
             const uid = app.state.user ? app.state.user.uid : "guest";
             await addDoc(collection(db, "applications"), {
                 jobId, jobTitle: job ? job.title : "Unknown", userId: uid,
@@ -650,7 +627,7 @@ const app = {
             const el = document.querySelector(`input[name="tag"][value="${val}"]`);
             if(el) el.checked = false;
         }
-        app.renderList(document.getElementById('main-content'));
+        app.resolveUrlAndRender(); // Re-render logic
     },
 
     updateModalChips: () => {
@@ -666,15 +643,15 @@ const app = {
     openConditionModal: () => {
         const modal = document.getElementById('condition-modal');
         const body = document.getElementById('condition-modal-body');
-        const currentCats = app.state.page === 'list' ? (app.state.filter.category || []) : [];
-        const currentTags = app.state.page === 'list' ? (app.state.filter.tag || []) : [];
+        const currentCats = app.state.filter.category || [];
+        const currentTags = app.state.filter.tag || [];
         
         let tagsHtml = "";
         for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
             tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
         }
         
-        const currentPref = app.state.page === 'list' ? app.state.filter.pref : '';
+        const currentPref = app.state.filter.pref || '';
         const prefHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">📍</span>都道府県</div>
@@ -692,17 +669,23 @@ const app = {
     closeConditionModal: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
-        if (app.state.page === 'top') {
-            const btn = document.getElementById('top-condition-btn');
-            if(btn) btn.innerHTML = (cats.length+tags.length) > 0 ? `<span>🔍 職種・こだわり (${cats.length+tags.length}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
-        } else if (app.state.page === 'list') {
-            app.state.filter.category = cats; app.state.filter.tag = tags;
-            app.renderList(document.getElementById('main-content'));
+        
+        // Save filters
+        app.state.filter.category = cats;
+        app.state.filter.tag = tags;
+
+        // If on Top, allow list navigation. If List, re-render.
+        if (window.location.search === '' || window.location.search === '?') { // Logic for Top Page
+             const btn = document.getElementById('top-condition-btn');
+             if(btn) btn.innerHTML = (cats.length+tags.length) > 0 ? `<span>🔍 職種・こだわり (${cats.length+tags.length}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
+        } else {
+             // List page re-render
+             app.resolveUrlAndRender();
         }
         document.getElementById('condition-modal').classList.remove('active');
     },
 
-    updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.renderListItems(); },
+    updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.resolveUrlAndRender(); },
     
     openRegionModal: () => { 
         document.getElementById('region-modal').classList.add('active'); 
@@ -730,11 +713,12 @@ const app = {
         } else {
             app.state.filter.pref = p;
             app.closeRegionModal();
-            if (app.state.page === 'top') {
-                const display = document.getElementById('top-pref-display');
-                if(display) display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
+            // Just verify we are on top or not to update text
+            const display = document.getElementById('top-pref-display');
+            if(display) {
+                display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
             } else {
-                app.renderList(document.getElementById('main-content'));
+                app.resolveUrlAndRender();
             }
         }
     },
@@ -749,7 +733,10 @@ const app = {
         if(window.history.length > 1) {
             window.history.back();
         } else {
-            app.router(app.state.page==='detail'?'list':'top');
+            // Fallback if direct link
+            const params = new URLSearchParams(window.location.search);
+            if(params.get('id')) app.router('list'); // From detail -> list
+            else app.router('top');
         }
     },
     
