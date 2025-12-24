@@ -40,7 +40,8 @@ const db = getFirestore(fbApp);
 // ===============================================
 // Config & Constants
 // ===============================================
-const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrRdK1TXUJlZll4AbgNAoU33X3JiMJek8Z8ZpQhALxBCC3T7nfnN211M7TeS7tTfVW/exec"; 
+// ★★★ ここをいただいたURLに更新しました ★★★
+const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4Y34AizgsNB9DDQcPN2wGv1KA5VrhAi3fA2wdFkRWNst50HJIun54ZpaSpw8bPvzn/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
 
 const ALL_CATEGORIES = [
@@ -54,7 +55,6 @@ const ALL_CATEGORIES = [
 ];
 const TOP_CATEGORIES = ALL_CATEGORIES.slice(0, 8);
 
-// ★ 新規追加: 雇用形態 ★
 const EMP_TYPES = ["期間工", "派遣社員", "正社員", "アルバイト・パート", "契約社員"];
 
 const TAG_GROUPS = {
@@ -105,7 +105,7 @@ const generateJobs = (count) => {
         const shuffledTags = [...ALL_TAGS_FLAT].sort(() => 0.5 - Math.random());
         const myTags = shuffledTags.slice(0, Math.floor(Math.random() * 4) + 2);
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
-        const type = EMP_TYPES[i % EMP_TYPES.length]; // 雇用形態をランダムに
+        const type = EMP_TYPES[i % EMP_TYPES.length];
         data.push({
             id: i,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
@@ -115,7 +115,7 @@ const generateJobs = (count) => {
             salarySupp: "入社祝い金あり",
             monthlyIncome: `${Math.floor(hourly * 168 / 10000)}万円〜`,
             tags: [...new Set(myTags)],
-            type: type, // 修正
+            type: type,
             isNew: i <= 25,
             desc: `${pref}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
             flow: "8:00〜17:00 (実働8h)",
@@ -165,11 +165,11 @@ const parseCSV = (text) => {
 // --- App Core ---
 const app = {
     state: {
-        filter: { pref: '', tag: [], category: [], sort: 'new', type: [] }, // typeフィルタ追加
+        filter: { pref: '', tag: [], category: [], sort: 'new', type: [] },
         user: null,
-        userProfile: {}, // ユーザーの詳細プロフィール用
+        userProfile: {},
         guestKeeps: [],
-        guestApplied: [], // ゲストの応募履歴用
+        guestApplied: [],
         mypageTab: 'keep'
     },
 
@@ -184,7 +184,6 @@ const app = {
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
         if (savedGuestKeeps) app.state.guestKeeps = JSON.parse(savedGuestKeeps);
         
-        // ★ ゲスト応募履歴読み込み
         const savedGuestApplied = localStorage.getItem('factory_work_navi_guest_applied');
         if (savedGuestApplied) app.state.guestApplied = JSON.parse(savedGuestApplied);
 
@@ -300,7 +299,7 @@ const app = {
         onSnapshot(userRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                app.state.userProfile = data; // ★ 全データを保持
+                app.state.userProfile = data;
                 app.state.userKeeps = data.keeps || [];
                 if(data.applied) app.state.user.applied = data.applied;
             } else {
@@ -311,6 +310,21 @@ const app = {
             app.resolveUrlAndRender(); 
             app.renderHeader();
         });
+    },
+
+    // ★★★ GASへデータを送信する関数 (no-cors) ★★★
+    sendToGas: async (data) => {
+        if (!GOOGLE_APPS_SCRIPT_URL) return;
+        try {
+            await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        } catch (e) {
+            console.error("GAS Send Error:", e);
+        }
     },
 
     renderHeader: () => {
@@ -330,26 +344,15 @@ const app = {
         }
     },
 
-    // ★ 利用規約ページ ★
     renderTerms: (target) => {
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">利用規約</div><div style="width:40px;"></div></div>
-            <div class="container" style="padding:20px;">
-                <h3>利用規約</h3>
-                <p style="margin-top:10px; color:#666; font-size:14px;">ここに利用規約の本文が入ります。</p>
-            </div>
-        `;
+            <div class="container" style="padding:20px;"><h3>利用規約</h3><p style="margin-top:10px; color:#666; font-size:14px;">ここに利用規約の本文が入ります。</p></div>`;
     },
-
-    // ★ プライバシーポリシーページ ★
     renderPrivacy: (target) => {
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">プライバシーポリシー</div><div style="width:40px;"></div></div>
-            <div class="container" style="padding:20px;">
-                <h3>プライバシーポリシー</h3>
-                <p style="margin-top:10px; color:#666; font-size:14px;">ここにプライバシーポリシーの本文が入ります。</p>
-            </div>
-        `;
+            <div class="container" style="padding:20px;"><h3>プライバシーポリシー</h3><p style="margin-top:10px; color:#666; font-size:14px;">ここにプライバシーポリシーの本文が入ります。</p></div>`;
     },
 
     renderTop: (target) => {
@@ -367,18 +370,14 @@ const app = {
                 </div>
             </div>
             ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
-            
             <div class="section-title">職種から探す</div>
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.router('list', {fromTop: true, category: ['${c.id}']})"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
-            
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">こだわりをもっと見る</button></div>
-            
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
-            
             <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:40px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
                 <div style="font-size:12px; color:#666; margin-bottom:10px; display:flex; justify-content:center; gap:20px;">
                     <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
@@ -461,16 +460,11 @@ const app = {
             if(tList) tList.forEach(t => chips.push(`<div class="filter-chip">🏷️ ${t} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('tag', '${t}')">×</div></div>`));
             return chips.length > 0 ? `<div class="active-filter-area"><span class="active-filter-label">条件:</span>${chips.join('')}</div>` : '';
         };
-        
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">求人検索</div><div style="width:40px;"></div></div>
-            <div class="sticky-search-header">
-                <div class="filter-bar"><button class="filter-toggle-btn" onclick="app.openConditionModal()">⚡️ 条件を詳しく絞り込む</button></div>
-                <div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div>
-            </div>
+            <div class="sticky-search-header"><div class="filter-bar"><button class="filter-toggle-btn" onclick="app.openConditionModal()">⚡️ 条件を詳しく絞り込む</button></div><div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div></div>
             <div class="sort-area"><div id="result-count" class="result-count"></div><select id="sort-order" style="border:none; color:#666;" onchange="app.updateFilterSingle('sort', this.value)"><option value="new">新着順</option><option value="salary">給与順</option></select></div>
-            <div id="list-container" class="job-list"></div>
-        `;
+            <div id="list-container" class="job-list"></div>`;
         document.getElementById('sort-order').value = sort;
         app.renderListItems();
     },
@@ -482,7 +476,6 @@ const app = {
             if (pref && j.pref !== pref) return false;
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
             if (category && category.length > 0 && !category.includes(j.category)) return false;
-            // ★ 雇用形態フィルタ実装 ★
             if (type && type.length > 0 && !type.includes(j.type)) return false;
             return true;
         });
@@ -493,32 +486,18 @@ const app = {
 
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
-        if (!job) {
-            target.innerHTML = '<p class="text-center mt-4">求人が見つかりません</p>';
-            return;
-        }
+        if (!job) { target.innerHTML = '<p class="text-center mt-4">求人が見つかりません</p>'; return; }
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
         target.innerHTML = `
-            <div style="position:relative;">
-                <button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button>
-                <img src="${getJobImage(job)}" class="detail-img-full">
-            </div>
-            <div class="detail-header">
-                <div class="detail-tags">${job.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
-                <div class="detail-company">${job.company}</div>
-                <div class="detail-title">${job.title}</div>
-            </div>
+            <div style="position:relative;"><button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button><img src="${getJobImage(job)}" class="detail-img-full"></div>
+            <div class="detail-header"><div class="detail-tags">${job.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="detail-company">${job.company}</div><div class="detail-title">${job.title}</div></div>
             <div class="detail-tabs"><div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div><div class="detail-tab-item" onclick="app.switchDetailTab(1)">特徴・選考</div></div>
             <div class="detail-padding">
                 <div id="tab-info" class="tab-content">
-                    <div class="detail-summary-card">
-                        <div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div>
-                        <div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}</span></div>
-                        <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
-                    </div>
+                    <div class="detail-summary-card"><div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div><div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}</span></div><div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div></div>
                     <div class="spec-header">仕事内容</div><div class="detail-description">${job.desc}</div>
                     <div class="spec-header">募集要項</div>
                     <div class="spec-container">
@@ -537,16 +516,10 @@ const app = {
                     <div class="spec-header">PRポイント</div><div class="detail-description">${job.points || '特にありません'}</div>
                     <div class="spec-header">福利厚生</div><div class="detail-description">${job.benefits || '-'}</div>
                     <div class="spec-header">応募・選考</div>
-                    <div class="spec-container">
-                        <div class="spec-row"><div class="spec-label">応募方法</div><div class="spec-value">${job.apply_flow || '-'}</div></div>
-                        <div class="spec-row"><div class="spec-label">選考期間</div><div class="spec-value">${job.process || '-'}</div></div>
-                    </div>
+                    <div class="spec-container"><div class="spec-row"><div class="spec-label">応募方法</div><div class="spec-value">${job.apply_flow || '-'}</div></div><div class="spec-row"><div class="spec-label">選考期間</div><div class="spec-value">${job.process || '-'}</div></div></div>
                 </div>
             </div>
-            <div class="fixed-cta">
-                <button class="btn-fav ${isKeep?'active':''} keep-btn-${job.id}" onclick="app.toggleKeep(${job.id})">♥</button>
-                ${isApplied ? `<button class="btn-apply-lg" style="background:#ccc; box-shadow:none; cursor:default;">応募済み</button>` : `<button class="btn-apply-lg" onclick="app.router('form')">今すぐ応募する 🚀</button>`}
-            </div>
+            <div class="fixed-cta"><button class="btn-fav ${isKeep?'active':''} keep-btn-${job.id}" onclick="app.toggleKeep(${job.id})">♥</button>${isApplied ? `<button class="btn-apply-lg" style="background:#ccc; box-shadow:none; cursor:default;">応募済み</button>` : `<button class="btn-apply-lg" onclick="app.router('form')">今すぐ応募する 🚀</button>`}</div>
         `;
     },
 
@@ -559,9 +532,9 @@ const app = {
     // ★★★ 応募フォーム (項目追加 & 自動入力) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
-        const id = params.get('id');
+        const id = params.get('id') || app.state.detailId; 
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
-        const p = app.state.userProfile || {}; // ユーザー情報
+        const p = app.state.userProfile || {}; 
 
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">応募フォーム</div><div style="width:40px;"></div></div>
@@ -591,7 +564,6 @@ const app = {
     },
 
     submitForm: async () => {
-        // バリデーション
         const ids = ['inp-name', 'inp-kana', 'inp-tel', 'inp-dob', 'inp-pref', 'inp-city'];
         let isValid = true;
         ids.forEach(id => {
@@ -607,8 +579,10 @@ const app = {
             const jobId = params.get('id');
             const job = JOBS_DATA.find(j => String(j.id) === String(jobId));
             const uid = app.state.user ? app.state.user.uid : "guest";
+            const userType = app.state.user ? '会員' : '非会員'; // ★ 会員判定追加
             
             const formData = {
+                action: 'apply', 
                 jobId, jobTitle: job ? job.title : "Unknown", userId: uid,
                 name: document.getElementById('inp-name').value,
                 kana: document.getElementById('inp-kana').value,
@@ -619,6 +593,7 @@ const app = {
                 city: document.getElementById('inp-city').value,
                 bldg: document.getElementById('inp-bldg').value,
                 gender: document.querySelector('input[name="gender"]:checked')?.value || '',
+                userType: userType, // ★ 送信データに追加
                 createdAt: serverTimestamp()
             };
 
@@ -627,10 +602,11 @@ const app = {
             if (app.state.user) {
                 await updateDoc(doc(db, "users", uid), { applied: arrayUnion(jobId) });
             } else {
-                // ゲスト用応募履歴保存
                 app.state.guestApplied.push(jobId);
                 localStorage.setItem('factory_work_navi_guest_applied', JSON.stringify(app.state.guestApplied));
             }
+
+            app.sendToGas(formData);
             
             alert("応募ありがとうございます。担当のものよりメールかお電話にてご連絡いたします。");
             app.router('list');
@@ -683,6 +659,7 @@ const app = {
         if(!isValid) { alert("未入力の必須項目があります"); return; }
         
         const data = {
+            action: 'register', // GAS識別用
             name: document.getElementById('reg-name').value,
             kana: document.getElementById('reg-kana').value,
             dob: document.getElementById('reg-dob').value,
@@ -697,143 +674,15 @@ const app = {
         app.register(data);
     },
 
-    removeFilter: (type, val) => {
-        if (type === 'pref') app.state.filter.pref = '';
-        else if (type === 'category') {
-            app.state.filter.category = app.state.filter.category.filter(c => c !== val);
-            const el = document.querySelector(`input[name="cat"][value="${val}"]`);
-            if(el) el.checked = false;
-        }
-        else if (type === 'tag') {
-            app.state.filter.tag = app.state.filter.tag.filter(t => t !== val);
-            const el = document.querySelector(`input[name="tag"][value="${val}"]`);
-            if(el) el.checked = false;
-        }
-        else if (type === 'type') { // 雇用形態解除
-            app.state.filter.type = app.state.filter.type.filter(t => t !== val);
-            const el = document.querySelector(`input[name="top-type"][value="${val}"]`);
-            if(el) el.checked = false;
-        }
-        app.resolveUrlAndRender();
-    },
-
-    updateModalChips: () => {
-        const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => ({val: c.value, label: getCategoryName(c.value)}));
-        const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => ({val: t.value, label: t.value}));
-        const types = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => ({val: t.value, label: t.value}));
-        const container = document.getElementById('modal-active-chips');
-        let html = '';
-        cats.forEach(c => html += `<div class="filter-chip">🏭 ${c.label}</div>`);
-        types.forEach(t => html += `<div class="filter-chip">💼 ${t.label}</div>`);
-        tags.forEach(t => html += `<div class="filter-chip">🏷️ ${t.label}</div>`);
-        container.innerHTML = html;
-    },
-
-    openConditionModal: () => {
-        const modal = document.getElementById('condition-modal');
-        const body = document.getElementById('condition-modal-body');
-        const currentCats = app.state.filter.category || [];
-        const currentTags = app.state.filter.tag || [];
-        const currentTypes = app.state.filter.type || [];
-        
-        let tagsHtml = "";
-        for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
-            tagsHtml += `<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏷️</span>${groupName}</div><div class="cond-grid-modern">${tags.map(t => `<label class="check-btn"><input type="checkbox" name="top-tag" value="${t}" ${currentTags.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div></div>`;
-        }
-        
-        const currentPref = app.state.filter.pref || '';
-        const prefHtml = `
-            <div class="cond-section">
-                <div class="cond-head"><span class="cond-icon">📍</span>都道府県</div>
-                <div style="background:#f9f9f9; padding:12px; border-radius:8px; text-align:center; font-weight:bold; color:#555; cursor:pointer;" onclick="app.openRegionModal()">
-                    ${currentPref || '選択されていません'} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>
-                </div>
-            </div>
-        `;
-
-        // ★ 雇用形態セクション追加 ★
-        const typeHtml = `
-            <div class="cond-section">
-                <div class="cond-head"><span class="cond-icon">💼</span>雇用形態</div>
-                <div class="cond-grid-modern">${EMP_TYPES.map(t => `<label class="check-btn"><input type="checkbox" name="top-type" value="${t}" ${currentTypes.includes(t)?'checked':''} onchange="app.updateModalChips()"><span>${t}</span></label>`).join('')}</div>
-            </div>
-        `;
-
-        body.innerHTML = `${prefHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${typeHtml}${tagsHtml}`;
-        modal.classList.add('active');
-        app.updateModalChips();
-    },
-
-    closeConditionModal: () => {
-        const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
-        const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
-        const types = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
-        
-        app.state.filter.category = cats;
-        app.state.filter.tag = tags;
-        app.state.filter.type = types;
-
-        const params = new URLSearchParams(window.location.search);
-        if (!params.get('page') && !params.get('id')) {
-             const btn = document.getElementById('top-condition-btn');
-             const total = cats.length + tags.length + types.length;
-             if(btn) btn.innerHTML = total > 0 ? `<span>🔍 職種・こだわり (${total}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
-        } else {
-             app.resolveUrlAndRender();
-        }
-        document.getElementById('condition-modal').classList.remove('active');
-    },
-
-    updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.resolveUrlAndRender(); },
-    
-    openRegionModal: () => { 
-        document.getElementById('region-modal').classList.add('active'); 
-        app.renderRegionStep1(); 
-    },
-    closeRegionModal: () => document.getElementById('region-modal').classList.remove('active'),
-    
-    renderRegionStep1: () => { 
-        document.getElementById('modal-title').innerText = "勤務地を選択"; 
-        document.getElementById('modal-body').innerHTML = `<div class="region-grid">${REGIONS.map((r, i) => `<div class="region-btn" onclick="app.renderRegionStep2(${i})"><span class="icon">${r.icon}</span><span>${r.name}</span></div>`).join('')}</div>`; 
-    },
-    
-    renderRegionStep2: (idx) => { 
-        const r = REGIONS[idx]; 
-        document.getElementById('modal-title').innerText = r.name; 
-        document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.selectPref('${p}')">${p}</div>`).join('')}</div>`; 
-    },
-    
-    selectPref: (p) => {
-        const condModal = document.getElementById('condition-modal');
-        if(condModal && condModal.classList.contains('active')) {
-            app.closeRegionModal();
-            app.state.filter.pref = p;
-            app.openConditionModal();
-        } else {
-            app.state.filter.pref = p;
-            app.closeRegionModal();
-            const display = document.getElementById('top-pref-display');
-            if(display) {
-                display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
-            } else {
-                app.resolveUrlAndRender();
-            }
-        }
-    },
-
-    login: async (email, pass) => { app.toast("ログイン中..."); try { await signInWithEmailAndPassword(auth, email, pass); app.toast("ログインしました"); app.router('top'); } catch (error) { console.error(error); alert("ログイン失敗: " + error.message); } },
-    logout: async () => { await signOut(auth); app.toast("ログアウトしました"); app.router('top'); },
-    
-    // ★ 登録時に全項目保存 ★
     register: async (d) => { 
         try { 
             const u = await createUserWithEmailAndPassword(auth, d.email, d.password); 
             await updateProfile(u.user, { displayName: d.name }); 
-            // 詳細プロフィールを保存
-            await setDoc(doc(db, "users", u.user.uid), { 
-                ...d, // 全項目保存
-                keeps: [], applied: [], createdAt: serverTimestamp() 
-            }); 
+            const userData = { ...d, keeps: [], applied: [], createdAt: serverTimestamp() };
+            delete userData.password;
+            delete userData.action;
+            await setDoc(doc(db, "users", u.user.uid), userData);
+            app.sendToGas(d);
             app.toast("登録完了！"); 
             app.router('top'); 
         } catch (e) { console.error(e); alert("登録エラー: " + e.message); } 
@@ -849,7 +698,6 @@ const app = {
         }
     },
     
-    // ★ マイページ (ゲスト対応) ★
     renderMypage: (target) => {
         if (!app.state.user) {
             // ゲスト: LocalStorageから読み込み
@@ -877,7 +725,6 @@ const app = {
                 </div>
             `;
         } else {
-            // 会員
             const { userKeeps, user } = app.state;
             const appliedIds = user.applied || [];
             const isKeepTab = app.state.mypageTab === 'keep';
