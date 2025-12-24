@@ -40,7 +40,6 @@ const db = getFirestore(fbApp);
 // ===============================================
 // Config & Constants
 // ===============================================
-// ★★★ ここをいただいたURLに更新しました ★★★
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4Y34AizgsNB9DDQcPN2wGv1KA5VrhAi3fA2wdFkRWNst50HJIun54ZpaSpw8bPvzn/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
 
@@ -529,7 +528,7 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
-    // ★★★ 応募フォーム (項目追加 & 自動入力) ★★★
+    // ★★★ 応募フォーム (項目追加 & 自動入力 & 同意リンク追加) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
@@ -551,15 +550,17 @@ const app = {
                     <div class="form-group"><label class="form-label">都道府県<span class="req">必須</span></label><select id="inp-pref" class="form-input"><option value="">選択してください</option>${PREFS.map(pr => `<option value="${pr}" ${p.pref===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
                     <div class="form-group"><label class="form-label">町名・番地<span class="req">必須</span></label><input type="text" id="inp-city" class="form-input" value="${p.city || ''}" placeholder="例：〇〇市〇〇町1-2-3"></div>
                     <div class="form-group"><label class="form-label">建物名・部屋番号<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input type="text" id="inp-bldg" class="form-input" value="${p.bldg || ''}"></div>
-                    <div class="form-group"><label class="form-label">性別<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label>
-                        <div class="radio-group">
-                            <label class="radio-label"><input type="radio" name="gender" value="male" ${p.gender==='male'?'checked':''}> 男性</label>
-                            <label class="radio-label"><input type="radio" name="gender" value="female" ${p.gender==='female'?'checked':''}> 女性</label>
-                        </div>
-                    </div>
-
+                    <div class="form-group"><label class="form-label">性別<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><div class="radio-group"><label class="radio-label"><input type="radio" name="gender" value="male" ${p.gender==='male'?'checked':''}> 男性</label><label class="radio-label"><input type="radio" name="gender" value="female" ${p.gender==='female'?'checked':''}> 女性</label></div></div>
                 </div>
-                <button class="btn btn-accent w-full" onclick="app.submitForm()">上記の内容で応募する</button>
+                
+                <div style="font-size:12px; text-align:center; margin-bottom:16px;">
+                    <span style="color:var(--primary-color); cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
+                    ・
+                    <span style="color:var(--primary-color); cursor:pointer; text-decoration:underline;" onclick="app.router('privacy')">プライバシーポリシー</span>
+                    <br>に同意して
+                </div>
+                
+                <button class="btn btn-accent w-full" onclick="app.submitForm()">応募する</button>
             </div>`;
     },
 
@@ -579,7 +580,7 @@ const app = {
             const jobId = params.get('id');
             const job = JOBS_DATA.find(j => String(j.id) === String(jobId));
             const uid = app.state.user ? app.state.user.uid : "guest";
-            const userType = app.state.user ? '会員' : '非会員'; // ★ 会員判定追加
+            const userType = app.state.user ? '会員' : '非会員'; 
             
             const formData = {
                 action: 'apply', 
@@ -593,7 +594,7 @@ const app = {
                 city: document.getElementById('inp-city').value,
                 bldg: document.getElementById('inp-bldg').value,
                 gender: document.querySelector('input[name="gender"]:checked')?.value || '',
-                userType: userType, // ★ 送信データに追加
+                userType: userType, 
                 createdAt: serverTimestamp()
             };
 
@@ -613,7 +614,7 @@ const app = {
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
-    // ★★★ 会員登録フォーム (項目追加) ★★★
+    // ★★★ 会員登録フォーム (項目追加 & 同意リンク追加) ★★★
     renderAuthPage: (target, type) => {
         if(type === 'login') {
             target.innerHTML = `
@@ -643,7 +644,15 @@ const app = {
                         <div class="form-group"><label class="form-label">メールアドレス<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input id="reg-email" type="email" class="form-input" placeholder="sample@example.com"></div>
                         <div class="form-group"><label class="form-label">パスワード<span class="req">必須</span></label><input id="reg-pass" type="password" class="form-input" placeholder="8文字以上"></div>
                     </div>
-                    <button class="btn btn-register w-full" onclick="app.validateAndRegister()">登録してはじめる</button>
+                    
+                    <div style="font-size:12px; text-align:center; margin-bottom:16px;">
+                        <span style="color:var(--primary-color); cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
+                        ・
+                        <span style="color:var(--primary-color); cursor:pointer; text-decoration:underline;" onclick="app.router('privacy')">プライバシーポリシー</span>
+                        <br>に同意して
+                    </div>
+
+                    <button class="btn btn-register w-full" onclick="app.validateAndRegister()">登録する</button>
                 </div>`;
         }
     },
@@ -659,7 +668,7 @@ const app = {
         if(!isValid) { alert("未入力の必須項目があります"); return; }
         
         const data = {
-            action: 'register', // GAS識別用
+            action: 'register', 
             name: document.getElementById('reg-name').value,
             kana: document.getElementById('reg-kana').value,
             dob: document.getElementById('reg-dob').value,
@@ -700,7 +709,6 @@ const app = {
     
     renderMypage: (target) => {
         if (!app.state.user) {
-            // ゲスト: LocalStorageから読み込み
             const keepJobs = JOBS_DATA.filter(j => app.state.guestKeeps.includes(String(j.id)));
             const appliedJobs = JOBS_DATA.filter(j => app.state.guestApplied.includes(String(j.id)));
             const isKeepTab = app.state.mypageTab === 'keep';
