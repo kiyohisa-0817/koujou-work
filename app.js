@@ -264,7 +264,7 @@ const app = {
     },
 
     router: (pageName, param = null) => {
-        app.saveFormData(); // 遷移前に入力を保存
+        app.saveFormData(); 
 
         let url = window.location.pathname;
         let query = {};
@@ -444,7 +444,6 @@ const app = {
         `;
     },
 
-    // ★★★ 新規追加：職種を選んでモーダルを開く ★★★
     selectCategoryAndOpenModal: (catId) => {
         app.state.filter.category = [catId];
         app.openConditionModal();
@@ -591,7 +590,6 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
-    // ★★★ 応募フォーム (誕生日セレクトボックス & メッセージ変更 & 下記同意文言) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
@@ -637,19 +635,17 @@ const app = {
                     <br>に同意して
                 </div>
                 
-                <button class="btn btn-accent w-full" onclick="app.submitForm()">下記利用規約・プライバシーポリシーに同意して応募する</button>
+                <button class="btn btn-accent w-full" onclick="app.submitForm()">応募する</button>
             </div>`;
         
         app.restoreFormData();
         
-        // 生年月日復元
         if (p.dob) {
             const [y, m, d] = p.dob.split('-');
             if(y) document.getElementById('inp-dob-y').value = y;
             if(m) document.getElementById('inp-dob-m').value = m;
             if(d) document.getElementById('inp-dob-d').value = d;
         } else {
-            // 一時保存からの復元(SelectBox)
             const temp = JSON.parse(sessionStorage.getItem('temp_form_data') || '{}');
             if(temp['inp-dob-y']) document.getElementById('inp-dob-y').value = temp['inp-dob-y'];
             if(temp['inp-dob-m']) document.getElementById('inp-dob-m').value = temp['inp-dob-m'];
@@ -658,7 +654,7 @@ const app = {
     },
 
     submitForm: async () => {
-        // バリデーション & スクロール
+        // ★★★ バリデーション強化 & スクロール ★★★
         const requiredIds = ['inp-name', 'inp-kana', 'inp-tel', 'inp-pref', 'inp-city'];
         const y = document.getElementById('inp-dob-y').value;
         const m = document.getElementById('inp-dob-m').value;
@@ -675,7 +671,6 @@ const app = {
             }
         });
         
-        // 年月日のバリデーション
         if (!dob) {
             if(!y) { document.getElementById('inp-dob-y').classList.add('input-error'); if(!firstError) firstError = document.getElementById('inp-dob-y'); }
             if(!m) { document.getElementById('inp-dob-m').classList.add('input-error'); if(!firstError) firstError = document.getElementById('inp-dob-m'); }
@@ -724,12 +719,12 @@ const app = {
             app.sendToGas(formData);
             sessionStorage.removeItem('temp_form_data');
             
+            // ★★★ 完了メッセージの変更 ★★★
             alert("応募が完了しました。詳細につきまして担当のものからメールかお電話にてご連絡させていただきます。");
             app.router('list');
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
-    // ★★★ 会員登録フォーム (デザイン改善 & 誕生日UI & スクロール) ★★★
     renderAuthPage: (target, type) => {
         if(type === 'login') {
             target.innerHTML = `
@@ -750,7 +745,7 @@ const app = {
                 <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">無料会員登録</div><div style="width:40px;"></div></div>
                 <div class="container" style="padding:16px;">
                     
-                    <div style="background:#f0f8ff; padding:20px; border-radius:12px; margin-bottom:24px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <div style="background:#e3f2fd; padding:16px; border-radius:12px; margin-bottom:24px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                         <h3 style="color:#0056b3; font-weight:bold; margin-bottom:12px; font-size:18px;">＼ 1分で完了！無料登録 ／</h3>
                         <p style="font-size:12px; color:#555; margin-bottom:16px;">会員になると、便利な機能がすべて使えます！</p>
                         <div style="display:flex; justify-content:space-around;">
@@ -804,7 +799,6 @@ const app = {
                 </div>`;
             
             app.restoreFormData();
-            // 復元データの誕生日反映
             const temp = JSON.parse(sessionStorage.getItem('temp_form_data') || '{}');
             if(temp['reg-dob-y']) document.getElementById('reg-dob-y').value = temp['reg-dob-y'];
             if(temp['reg-dob-m']) document.getElementById('reg-dob-m').value = temp['reg-dob-m'];
@@ -825,7 +819,6 @@ const app = {
         const d = document.getElementById('reg-dob-d').value;
         const dob = (y && m && d) ? `${y}-${m}-${d}` : '';
 
-        // バリデーション & スクロール
         let firstError = null;
         [name, kana, pref, city, tel, pass].forEach(el => {
             el.classList.remove('input-error');
@@ -948,6 +941,7 @@ const app = {
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); }
 };
 
+// ★★★ IMPORTANT: Ensure 'app' is globally available immediately ★★★
 window.app = app;
 
 window.addEventListener('popstate', () => {
