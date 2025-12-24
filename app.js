@@ -75,6 +75,7 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
+// --- Utils ---
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
@@ -94,6 +95,7 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
+// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
     for (let i = 1; i <= count; i++) {
@@ -718,6 +720,7 @@ const app = {
             app.sendToGas(formData);
             sessionStorage.removeItem('temp_form_data');
             
+            // ★★★ 完了メッセージの変更 ★★★
             alert("応募が完了しました。詳細につきまして担当のものからメールかお電話にてご連絡させていただきます。");
             app.router('list');
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
@@ -938,6 +941,7 @@ const app = {
 
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); },
 
+    // ★★★ 重要：モーダル閉じる処理 ★★★
     closeConditionModal: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
@@ -947,6 +951,7 @@ const app = {
         app.state.filter.tag = tags;
         app.state.filter.type = types;
 
+        // ボタンの表示更新（Topページのみ）
         const btn = document.getElementById('top-condition-btn');
         if(btn) {
              const total = cats.length + tags.length + types.length;
@@ -987,7 +992,7 @@ const app = {
         if(display) {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
-        // Top以外なら即検索
+        // リスト画面なら再検索
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
