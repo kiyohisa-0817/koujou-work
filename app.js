@@ -346,12 +346,94 @@ const app = {
     renderTerms: (target) => {
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">利用規約</div><div style="width:40px;"></div></div>
-            <div class="container" style="padding:20px;"><h3>利用規約</h3><p style="margin-top:10px; color:#666; font-size:14px;">ここに利用規約の本文が入ります。</p></div>`;
+            <div class="container" style="padding:20px; font-size:14px; line-height:1.6;">
+                <h3 style="margin-bottom:20px; font-size:18px; font-weight:bold;">利用規約（Terms of Use）</h3>
+                
+                <h4 style="margin:16px 0 8px; font-weight:bold;">第1条（適用）</h4>
+                <p>本規約は、株式会社Re.ACT（以下「当社」）が提供する全てのサービス・コンテンツ（以下「本サービス」）の利用条件を定めるものです。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">第2条（利用登録）</h4>
+                <p>利用希望者は当社所定の方法により登録申請し、当社が承認した時点で利用登録が完了します。<br>登録情報に虚偽がある場合、当社は利用登録を取り消すことがあります。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">第3条（ユーザーの責任）</h4>
+                <p>利用者は自己の責任で本サービスを利用するものとし、他者への迷惑行為や違法行為を行ってはなりません。<br>当社は利用者間または第三者間のトラブルに関与せず、責任を負いません。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">第4条（禁止事項）</h4>
+                <p>以下の行為を禁止します（例示）：</p>
+                <ul style="list-style-type:disc; padding-left:20px; margin-top:4px;">
+                    <li>法令・公序良俗に反する行為</li>
+                    <li>虚偽情報の登録</li>
+                    <li>当社サーバへの不正アクセス</li>
+                    <li>他者情報の無断利用</li>
+                </ul>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">第5条（サービスの変更・中断）</h4>
+                <p>当社は予告なくサービス内容の変更、中断、停止を行うことがあります。これによって生じた損害について当社は責任を負いません。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">第6条（免責）</h4>
+                <p>当社は本サービスから得られる情報の正確性・完全性・有用性について保証せず、利用による損害について一切責任を負いません。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">第7条（規約改定）</h4>
+                <p>当社は本規約を随時変更できます。変更後は本サイトへ掲載した時点で有効になります。</p>
+                
+                <div style="margin-bottom:40px;"></div>
+            </div>`;
     },
     renderPrivacy: (target) => {
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.back()">＜</button><div class="page-header-title">プライバシーポリシー</div><div style="width:40px;"></div></div>
-            <div class="container" style="padding:20px;"><h3>プライバシーポリシー</h3><p style="margin-top:10px; color:#666; font-size:14px;">ここにプライバシーポリシーの本文が入ります。</p></div>`;
+            <div class="container" style="padding:20px; font-size:14px; line-height:1.6;">
+                <h3 style="margin-bottom:20px; font-size:18px; font-weight:bold;">プライバシーポリシー（Privacy Policy）</h3>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">1．基本方針</h4>
+                <p>当社は、個人情報の重要性を認識し、適切な保護・管理を行います。個人情報保護法その他の関連法令を遵守します。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">2．個人情報の定義</h4>
+                <p>「個人情報」とは、生存する個人を識別できる情報（氏名、住所、電話番号、メールアドレス 等）をいいます。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">3．収集する情報と利用目的</h4>
+                <p>当社が収集する個人情報と利用目的は次の通りです：</p>
+                <ul style="list-style-type:disc; padding-left:20px; margin-top:4px;">
+                    <li style="margin-bottom:4px;"><strong>応募・登録時に提供される情報</strong><br>氏名、連絡先、職歴、学歴、メールアドレス等<br>→ 本サービス提供、安全な運用、利用者対応のため</li>
+                    <li style="margin-bottom:4px;"><strong>お問い合わせ・応募情報</strong><br>→ 連絡、返答、内部処理のため</li>
+                    <li style="margin-bottom:4px;"><strong>ログ情報・クッキー等の技術的情報</strong><br>→ サービス向上、アクセス解析、システム管理のため</li>
+                </ul>
+                <p style="font-size:11px; color:#888; margin-top:4px;">※この方針は JOBPAL の例に類似した構成を参考にしています。JobPal</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">4．第三者提供</h4>
+                <p>当社は以下の場合を除き、個人情報を第三者へ提供しません：</p>
+                <ul style="list-style-type:disc; padding-left:20px; margin-top:4px;">
+                    <li>利用目的の達成に必要な場合</li>
+                    <li>法令に基づく開示請求があった場合</li>
+                    <li>人の生命、身体、財産の保護のため必要な場合</li>
+                </ul>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">5．安全管理</h4>
+                <p>個人情報の漏洩、紛失、改ざん、不正アクセス等を防ぐため、必要かつ適切な安全管理措置を講じます。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">6．委託</h4>
+                <p>個人情報処理の一部を外部委託する場合がありますが、その場合でも当社は適切な管理・監督を行います。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">7．共同利用</h4>
+                <p>当社グループ会社と個人情報を共有して共同利用する場合、その範囲、目的、管理責任者等を定めたうえで実施します。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">8．クッキーの利用</h4>
+                <p>本サイトではクッキーを使用し、アクセス情報の収集、サービス改善、利便性向上を行います。クッキーにより個人を特定する情報は保存しません。</p>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">9．個人情報の開示・訂正・削除</h4>
+                <p>本人からの請求があれば、法令に従い開示・訂正・削除等に対応します。連絡先は以下に記載します。</p>
+                <div style="background:#f9f9f9; padding:10px; margin-top:8px; border-radius:4px;">
+                    <strong>【問合せ先】</strong><br>
+                    株式会社Re.ACT<br>
+                    代表：首藤清久<br>
+                    メール：k-shuto@react-agent.biz
+                </div>
+
+                <h4 style="margin:16px 0 8px; font-weight:bold;">10．ポリシーの変更</h4>
+                <p>本ポリシーは法令・サービス内容の変更に応じて更新します。変更後の内容は当社サイトに掲示した時点で効力が発生します。</p>
+                
+                <div style="margin-bottom:40px;"></div>
+            </div>`;
     },
 
     renderTop: (target) => {
@@ -528,7 +610,7 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
-    // ★★★ 応募フォーム (項目追加 & 自動入力 & 同意リンク追加) ★★★
+    // ★★★ 応募フォーム (同意リンク追加) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
@@ -614,7 +696,7 @@ const app = {
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
-    // ★★★ 会員登録フォーム (項目追加 & 同意リンク追加) ★★★
+    // ★★★ 会員登録フォーム (同意リンク追加) ★★★
     renderAuthPage: (target, type) => {
         if(type === 'login') {
             target.innerHTML = `
