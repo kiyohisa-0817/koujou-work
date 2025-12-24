@@ -167,14 +167,15 @@ const app = {
         userProfile: {},
         guestKeeps: [],
         guestApplied: [],
-        mypageTab: 'keep'
+        mypageTab: 'keep',
+        isModalSearchMode: false // ★追加: モーダルが検索モードかどうか
     },
 
     init: async () => {
-        // ★★★ モーダル初期化を最優先で実行 ★★★
+        // ★★★ モーダル初期化 (ボタンにID付与) ★★★
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
-                <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
+                <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button id="modal-decide-btn" class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
             `);
         }
         if(!document.getElementById('region-modal')) {
@@ -418,7 +419,7 @@ const app = {
                 <div class="search-box">
                     <div class="search-input-area">
                         <button type="button" class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
-                        <button type="button" class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal()">職種・こだわり条件を選択<span>▼</span></button>
+                        <button type="button" class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal(false)">職種・こだわり条件を選択<span>▼</span></button>
                     </div>
                     <button type="button" class="btn-search" onclick="app.handleTopSearch()">検索</button>
                 </div>
@@ -426,10 +427,10 @@ const app = {
             ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
             <div class="section-title">職種から探す</div>
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.selectCategoryAndOpenModal('${c.id}')"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
-            <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
+            <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal(true)">職種をもっと見る</button></div>
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
-            <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal()">こだわりをもっと見る</button></div>
+            <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal(true)">こだわりをもっと見る</button></div>
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
             <div style="background:#fff; padding:30px 20px; text-align:center; border-top:1px solid #eee; margin-top:40px; padding-bottom: calc(30px + env(safe-area-inset-bottom));">
@@ -444,7 +445,7 @@ const app = {
 
     selectCategoryAndOpenModal: (catId) => {
         app.state.filter.category = [catId];
-        app.openConditionModal();
+        app.openConditionModal(true);
     },
 
     createJobCard: (job) => {
@@ -521,7 +522,7 @@ const app = {
         };
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">求人検索</div><div style="width:40px;"></div></div>
-            <div class="sticky-search-header"><div class="filter-bar"><button type="button" class="filter-toggle-btn" onclick="app.openConditionModal()">⚡️ 条件を詳しく絞り込む</button></div><div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div></div>
+            <div class="sticky-search-header"><div class="filter-bar"><button type="button" class="filter-toggle-btn" onclick="app.openConditionModal(true)">⚡️ 条件を詳しく絞り込む</button></div><div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div></div>
             <div class="sort-area"><div id="result-count" class="result-count"></div><select id="sort-order" style="border:none; color:#666;" onchange="app.updateFilterSingle('sort', this.value)"><option value="new">新着順</option><option value="salary">給与順</option></select></div>
             <div id="list-container" class="job-list"></div>`;
         document.getElementById('sort-order').value = sort;
@@ -652,7 +653,7 @@ const app = {
     },
 
     submitForm: async () => {
-        // ★★★ バリデーション & 自動スクロール & メッセージ表示 ★★★
+        // ★★★ バリデーション強化 & スクロール ★★★
         const requiredIds = ['inp-name', 'inp-kana', 'inp-tel', 'inp-pref', 'inp-city'];
         const y = document.getElementById('inp-dob-y').value;
         const m = document.getElementById('inp-dob-m').value;
@@ -937,7 +938,6 @@ const app = {
 
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); },
 
-    // ★★★ 重要：モーダル閉じる処理 ★★★
     closeConditionModal: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
@@ -947,17 +947,17 @@ const app = {
         app.state.filter.tag = tags;
         app.state.filter.type = types;
 
-        // ボタンの表示更新（Topページのみ）
         const btn = document.getElementById('top-condition-btn');
         if(btn) {
              const total = cats.length + tags.length + types.length;
              btn.innerHTML = total > 0 ? `<span>🔍 職種・こだわり (${total}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
         }
         
-        // リスト画面なら再検索
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('page') === 'list') {
-             app.resolveUrlAndRender();
+        // ★★★ フラグに応じて検索実行するか分岐 ★★★
+        if (app.state.isModalSearchMode) {
+             app.router('list');
+        } else {
+             // 検索しない場合は閉じるだけ (Topページの表示は上で更新済み)
         }
         document.getElementById('condition-modal').classList.remove('active');
     },
@@ -987,10 +987,12 @@ const app = {
         if(display) {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
-        // リスト画面なら再検索
+        // Top以外なら即検索
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
+        } else if (app.state.isModalSearchMode) { // モーダル内からの遷移なら
+             app.openConditionModal(true);
         }
     },
     
@@ -1020,12 +1022,21 @@ const app = {
         container.innerHTML = html;
     },
 
-    openConditionModal: () => {
+    // ★★★ 検索モードフラグを受け取るように変更 ★★★
+    openConditionModal: (isSearch = false) => {
+        app.state.isModalSearchMode = isSearch; // フラグ保存
+        
         const modal = document.getElementById('condition-modal');
         const body = document.getElementById('condition-modal-body');
         const currentCats = app.state.filter.category || [];
         const currentTags = app.state.filter.tag || [];
         const currentTypes = app.state.filter.type || [];
+        
+        // ボタン文言変更
+        const decideBtn = document.getElementById('modal-decide-btn');
+        if(decideBtn) {
+            decideBtn.innerText = isSearch ? "この条件で決定して検索" : "この条件で決定";
+        }
         
         let tagsHtml = "";
         for (const [groupName, tags] of Object.entries(TAG_GROUPS)) {
