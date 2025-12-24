@@ -198,7 +198,7 @@ const app = {
             app.resolveUrlAndRender();
         });
 
-        // Modals
+        // Initialize Modals
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
@@ -264,8 +264,7 @@ const app = {
     },
 
     router: (pageName, param = null) => {
-        // ★★★ 入力内容の保存 (ページ遷移前に実行) ★★★
-        app.saveFormData();
+        app.saveFormData(); // 遷移前に入力を保存
 
         let url = window.location.pathname;
         let query = {};
@@ -292,11 +291,9 @@ const app = {
         window.scrollTo(0, 0);
     },
 
-    // ★★★ フォームデータ保存処理 ★★★
     saveFormData: () => {
         const inputs = document.querySelectorAll('input, select');
-        if (inputs.length === 0) return; // 入力欄がないページでは何もしない
-        
+        if (inputs.length === 0) return;
         const data = {};
         let hasData = false;
         inputs.forEach(el => {
@@ -314,27 +311,21 @@ const app = {
         }
     },
 
-    // ★★★ フォームデータ復元処理 ★★★
     restoreFormData: () => {
         const json = sessionStorage.getItem('temp_form_data');
         if (!json) return;
         const data = JSON.parse(json);
-        
         Object.keys(data).forEach(key => {
             const el = document.getElementById(key);
             if (el) {
                 el.value = data[key];
             } else {
-                // ラジオボタンの対応
                 const radios = document.getElementsByName(key);
                 if (radios.length > 0) {
-                    radios.forEach(r => {
-                        if (r.value === data[key]) r.checked = true;
-                    });
+                    radios.forEach(r => { if (r.value === data[key]) r.checked = true; });
                 }
             }
         });
-        // 復元後にデータを消すかどうかはUXによるが、戻ってきてまた消えると困るので残す
     },
 
     syncUserKeeps: (uid) => {
@@ -436,7 +427,7 @@ const app = {
             </div>
             ${!app.state.user ? `<div class="benefit-area"><h3 class="text-center font-bold mb-4" style="color:var(--success-color);">＼ 会員登録でもっと便利に！ ／</h3><div class="benefit-grid"><div class="benefit-item"><span class="benefit-icon">㊙️</span>非公開求人<br>の閲覧</div><div class="benefit-item"><span class="benefit-icon">❤️</span>キープ機能<br>で比較</div><div class="benefit-item"><span class="benefit-icon">📝</span>Web履歴書<br>で即応募</div></div><button class="btn btn-register w-full" onclick="app.router('register')">最短1分！無料で会員登録する</button></div>` : ''}
             <div class="section-title">職種から探す</div>
-            <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.openConditionModal()"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
+            <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.selectCategoryAndOpenModal('${c.id}')"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button class="btn-more-link" onclick="app.openConditionModal()">職種をもっと見る</button></div>
             <div class="section-title">人気のこだわり</div>
             <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
@@ -451,6 +442,12 @@ const app = {
                 <div style="font-size:11px; color:#999;">&copy; 工場ワーク NAVi</div>
             </div>
         `;
+    },
+
+    // ★★★ 新規追加：職種を選んでモーダルを開く ★★★
+    selectCategoryAndOpenModal: (catId) => {
+        app.state.filter.category = [catId];
+        app.openConditionModal();
     },
 
     createJobCard: (job) => {
@@ -594,14 +591,14 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
-    // ★★★ 応募フォーム (誕生日セレクトボックス & データ復元) ★★★
+    // ★★★ 応募フォーム (誕生日セレクトボックス & メッセージ変更 & 下記同意文言) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         const p = app.state.userProfile || {}; 
 
-        // 年・月・日の選択肢生成
+        // 年・月・日生成
         const currentYear = new Date().getFullYear();
         const years = Array.from({length: 60}, (_, i) => currentYear - 16 - i).map(y => `<option value="${y}">${y}年</option>`).join('');
         const months = Array.from({length: 12}, (_, i) => i + 1).map(m => `<option value="${String(m).padStart(2,'0')}">${m}月</option>`).join('');
@@ -640,35 +637,55 @@ const app = {
                     <br>に同意して
                 </div>
                 
-                <button class="btn btn-accent w-full" onclick="app.submitForm()">応募が完了しました。詳細につきまして担当のものからメールかお電話にてご連絡させていただきます。</button>
+                <button class="btn btn-accent w-full" onclick="app.submitForm()">下記利用規約・プライバシーポリシーに同意して応募する</button>
             </div>`;
         
-        // 保存データの復元（プロフデータがない場合や修正中の場合）
         app.restoreFormData();
         
-        // 既存の生年月日データがある場合、セレクトボックスに反映
+        // 生年月日復元
         if (p.dob) {
             const [y, m, d] = p.dob.split('-');
             if(y) document.getElementById('inp-dob-y').value = y;
             if(m) document.getElementById('inp-dob-m').value = m;
             if(d) document.getElementById('inp-dob-d').value = d;
+        } else {
+            // 一時保存からの復元(SelectBox)
+            const temp = JSON.parse(sessionStorage.getItem('temp_form_data') || '{}');
+            if(temp['inp-dob-y']) document.getElementById('inp-dob-y').value = temp['inp-dob-y'];
+            if(temp['inp-dob-m']) document.getElementById('inp-dob-m').value = temp['inp-dob-m'];
+            if(temp['inp-dob-d']) document.getElementById('inp-dob-d').value = temp['inp-dob-d'];
         }
     },
 
     submitForm: async () => {
-        const name = document.getElementById('inp-name');
-        const tel = document.getElementById('inp-tel');
-        
-        // 生年月日結合
+        // バリデーション & スクロール
+        const requiredIds = ['inp-name', 'inp-kana', 'inp-tel', 'inp-pref', 'inp-city'];
         const y = document.getElementById('inp-dob-y').value;
         const m = document.getElementById('inp-dob-m').value;
         const d = document.getElementById('inp-dob-d').value;
         const dob = (y && m && d) ? `${y}-${m}-${d}` : '';
 
-        // バリデーション
-        if (!name.value.trim() || !tel.value.trim() || !dob || !document.getElementById('inp-pref').value || !document.getElementById('inp-city').value) {
-            alert("未入力の必須項目があります");
-            return;
+        let firstError = null;
+        requiredIds.forEach(id => {
+            const el = document.getElementById(id);
+            el.classList.remove('input-error');
+            if (!el.value.trim()) { 
+                el.classList.add('input-error'); 
+                if(!firstError) firstError = el;
+            }
+        });
+        
+        // 年月日のバリデーション
+        if (!dob) {
+            if(!y) { document.getElementById('inp-dob-y').classList.add('input-error'); if(!firstError) firstError = document.getElementById('inp-dob-y'); }
+            if(!m) { document.getElementById('inp-dob-m').classList.add('input-error'); if(!firstError) firstError = document.getElementById('inp-dob-m'); }
+            if(!d) { document.getElementById('inp-dob-d').classList.add('input-error'); if(!firstError) firstError = document.getElementById('inp-dob-d'); }
+        }
+
+        if (firstError) { 
+            alert("必須項目が入力されていません"); 
+            firstError.scrollIntoView({behavior: "smooth", block: "center"});
+            return; 
         }
         
         app.toast("送信中...");
@@ -682,10 +699,10 @@ const app = {
             const formData = {
                 action: 'apply', 
                 jobId, jobTitle: job ? job.title : "Unknown", userId: uid,
-                name: name.value,
+                name: document.getElementById('inp-name').value,
                 kana: document.getElementById('inp-kana').value,
                 email: document.getElementById('inp-email').value,
-                tel: tel.value,
+                tel: document.getElementById('inp-tel').value,
                 dob: dob,
                 pref: document.getElementById('inp-pref').value,
                 city: document.getElementById('inp-city').value,
@@ -705,14 +722,14 @@ const app = {
             }
 
             app.sendToGas(formData);
-            sessionStorage.removeItem('temp_form_data'); // 送信完了したら一時保存削除
+            sessionStorage.removeItem('temp_form_data');
             
             alert("応募が完了しました。詳細につきまして担当のものからメールかお電話にてご連絡させていただきます。");
             app.router('list');
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
     },
 
-    // ★★★ 会員登録フォーム (デザイン改善 & 誕生日UI & データ復元) ★★★
+    // ★★★ 会員登録フォーム (デザイン改善 & 誕生日UI & スクロール) ★★★
     renderAuthPage: (target, type) => {
         if(type === 'login') {
             target.innerHTML = `
@@ -724,7 +741,6 @@ const app = {
                     <p class="mt-4 text-center" onclick="app.router('register')">新規登録はこちら</p>
                 </div>`;
         } else {
-            // 年・月・日の選択肢生成
             const currentYear = new Date().getFullYear();
             const years = Array.from({length: 60}, (_, i) => currentYear - 16 - i).map(y => `<option value="${y}">${y}年</option>`).join('');
             const months = Array.from({length: 12}, (_, i) => i + 1).map(m => `<option value="${String(m).padStart(2,'0')}">${m}月</option>`).join('');
@@ -734,12 +750,22 @@ const app = {
                 <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">無料会員登録</div><div style="width:40px;"></div></div>
                 <div class="container" style="padding:16px;">
                     
-                    <div style="background:#e3f2fd; padding:16px; border-radius:12px; margin-bottom:20px; border:2px dashed var(--primary-color);">
-                        <h3 style="text-align:center; color:var(--primary-color); font-weight:bold; margin-bottom:10px;">＼ 登録するとこんなに便利！ ／</h3>
-                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center; font-size:11px; font-weight:bold;">
-                            <div><span style="font-size:24px;">㊙️</span><br>非公開求人</div>
-                            <div><span style="font-size:24px;">📝</span><br>応募が簡単</div>
-                            <div><span style="font-size:24px;">💌</span><br>スカウト</div>
+                    <div style="background:#f0f8ff; padding:20px; border-radius:12px; margin-bottom:24px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                        <h3 style="color:#0056b3; font-weight:bold; margin-bottom:12px; font-size:18px;">＼ 1分で完了！無料登録 ／</h3>
+                        <p style="font-size:12px; color:#555; margin-bottom:16px;">会員になると、便利な機能がすべて使えます！</p>
+                        <div style="display:flex; justify-content:space-around;">
+                            <div style="display:flex; flex-direction:column; align-items:center;">
+                                <div style="background:white; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">📝</div>
+                                <span style="font-size:10px; font-weight:bold; margin-top:6px;">応募が簡単</span>
+                            </div>
+                            <div style="display:flex; flex-direction:column; align-items:center;">
+                                <div style="background:white; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">㊙️</div>
+                                <span style="font-size:10px; font-weight:bold; margin-top:6px;">非公開求人</span>
+                            </div>
+                            <div style="display:flex; flex-direction:column; align-items:center;">
+                                <div style="background:white; width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">💌</div>
+                                <span style="font-size:10px; font-weight:bold; margin-top:6px;">スカウト</span>
+                            </div>
                         </div>
                     </div>
 
@@ -778,34 +804,60 @@ const app = {
                 </div>`;
             
             app.restoreFormData();
+            // 復元データの誕生日反映
+            const temp = JSON.parse(sessionStorage.getItem('temp_form_data') || '{}');
+            if(temp['reg-dob-y']) document.getElementById('reg-dob-y').value = temp['reg-dob-y'];
+            if(temp['reg-dob-m']) document.getElementById('reg-dob-m').value = temp['reg-dob-m'];
+            if(temp['reg-dob-d']) document.getElementById('reg-dob-d').value = temp['reg-dob-d'];
         }
     },
 
     validateAndRegister: () => {
         const name = document.getElementById('reg-name');
+        const kana = document.getElementById('reg-kana');
+        const pref = document.getElementById('reg-pref');
+        const city = document.getElementById('reg-city');
+        const tel = document.getElementById('reg-tel');
+        const pass = document.getElementById('reg-pass');
         
         const y = document.getElementById('reg-dob-y').value;
         const m = document.getElementById('reg-dob-m').value;
         const d = document.getElementById('reg-dob-d').value;
         const dob = (y && m && d) ? `${y}-${m}-${d}` : '';
 
-        if(!name.value.trim() || !dob) {
-             alert("未入力の必須項目があります"); return; 
-        }
+        // バリデーション & スクロール
+        let firstError = null;
+        [name, kana, pref, city, tel, pass].forEach(el => {
+            el.classList.remove('input-error');
+            if(!el.value.trim()) {
+                el.classList.add('input-error');
+                if(!firstError) firstError = el;
+            }
+        });
         
-        // その他のバリデーションは簡易省略（必要に応じて追加）
+        if(!dob) {
+            if(!y) { document.getElementById('reg-dob-y').classList.add('input-error'); if(!firstError) firstError = document.getElementById('reg-dob-y'); }
+            if(!m) { document.getElementById('reg-dob-m').classList.add('input-error'); if(!firstError) firstError = document.getElementById('reg-dob-m'); }
+            if(!d) { document.getElementById('reg-dob-d').classList.add('input-error'); if(!firstError) firstError = document.getElementById('reg-dob-d'); }
+        }
+
+        if(firstError) {
+             alert("必須項目が入力されていません");
+             firstError.scrollIntoView({behavior: "smooth", block: "center"});
+             return; 
+        }
         
         const data = {
             action: 'register', 
             name: name.value,
-            kana: document.getElementById('reg-kana').value,
+            kana: kana.value,
             dob: dob,
-            pref: document.getElementById('reg-pref').value,
-            city: document.getElementById('reg-city').value,
+            pref: pref.value,
+            city: city.value,
             bldg: document.getElementById('reg-bldg').value,
-            tel: document.getElementById('reg-tel').value,
+            tel: tel.value,
             email: document.getElementById('reg-email').value,
-            password: document.getElementById('reg-pass').value,
+            password: pass.value,
             gender: document.querySelector('input[name="gender"]:checked')?.value || ''
         };
         app.register(data);
@@ -820,7 +872,7 @@ const app = {
             delete userData.action;
             await setDoc(doc(db, "users", u.user.uid), userData);
             app.sendToGas(d);
-            sessionStorage.removeItem('temp_form_data'); // 完了したら削除
+            sessionStorage.removeItem('temp_form_data'); 
             
             app.toast("登録完了！"); 
             app.router('top'); 
@@ -896,7 +948,6 @@ const app = {
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); }
 };
 
-// ★★★ 重要：ここを確実に定義 ★★★
 window.app = app;
 
 window.addEventListener('popstate', () => {
