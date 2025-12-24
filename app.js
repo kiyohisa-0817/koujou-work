@@ -166,7 +166,8 @@ const app = {
         filter: { pref: '', tag: [], category: [], sort: 'new' },
         user: null,
         guestKeeps: [],
-        mypageTab: 'keep'
+        mypageTab: 'keep',
+        currentUrl: window.location.href // ★ Track URL
     },
 
     init: async () => {
@@ -235,7 +236,8 @@ const app = {
 
         app.renderHeader();
 
-        // ★★★ FIX: Initialize History State ★★★
+        // Initialize state
+        app.state.currentUrl = window.location.href;
         const initialParams = new URLSearchParams(window.location.search);
         const initialId = initialParams.get('id');
         const initialState = {
@@ -258,28 +260,26 @@ const app = {
         }
         document.getElementById('loading-overlay').style.display = 'none';
 
-        // ★★★ FIX: Strongest Popstate Handling ★★★
-        // Assign directly to onpopstate to ensure priority and avoid conflicts
-        window.onpopstate = (event) => {
-            // Slight delay to allow browser to finish updating location
-            setTimeout(() => {
+        // ★★★ FIX: Polling Interval to catch URL changes (The "Safety Net") ★★★
+        setInterval(() => {
+            if (window.location.href !== app.state.currentUrl) {
+                app.state.currentUrl = window.location.href;
                 const params = new URLSearchParams(window.location.search);
                 const id = params.get('id');
                 
-                // 1. Trust URL first
                 if (id) {
-                    app.router('detail', parseInt(id), false);
-                    return;
-                }
-
-                // 2. Fallback to state or Top
-                if (event.state && event.state.page) {
-                    app.router(event.state.page, event.state.id, false);
+                    app.router('detail', parseInt(id), false); // Don't push, just render
                 } else {
-                    app.router('top', null, false);
+                    // Back to root/list
+                    // We try to respect the history state if it exists, otherwise default to top
+                    if (window.history.state && window.history.state.page) {
+                        app.router(window.history.state.page, window.history.state.id, false);
+                    } else {
+                        app.router('top', null, false);
+                    }
                 }
-            }, 10);
-        };
+            }
+        }, 200); // Check every 200ms
     },
 
     syncUserKeeps: (uid) => {
@@ -311,6 +311,7 @@ const app = {
         if (addHistory) {
             const newUrl = (pageName === 'detail' && param) ? `${window.location.pathname}?id=${param}` : window.location.pathname;
             window.history.pushState({page: pageName, id: param}, '', newUrl);
+            app.state.currentUrl = window.location.href; // Update currentUrl immediately so poller doesn't double-fire
         }
         
         const container = document.getElementById('main-content');
@@ -594,61 +595,6 @@ const app = {
             if (app.state.user) await updateDoc(doc(db, "users", uid), { applied: arrayUnion(jobId) });
             alert("応募完了！"); app.router('list');
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
-    },
-
-    renderMypage: (target) => {
-        if (!app.state.user) {
-            // Guest View (Keeps only)
-            const keepJobs = JOBS_DATA.filter(j => app.state.guestKeeps.includes(String(j.id)));
-            target.innerHTML = `
-                <div class="mypage-header">
-                    <h2 style="font-size:20px; font-weight:bold;">マイページ (ゲスト)</h2>
-                    <p style="font-size:12px; margin-top:8px;">ログインすると応募履歴も確認できます</p>
-                </div>
-                <div style="padding:0 16px;">
-                    <div class="mypage-tabs">
-                        <div class="mypage-tab active">キープ中 (${keepJobs.length})</div>
-                        <div class="mypage-tab" style="opacity:0.5;">応募履歴</div>
-                    </div>
-                    <div class="job-list">
-                        ${keepJobs.length ? keepJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">キープ中の求人はありません</p>'}
-                    </div>
-                </div>
-                <div class="container" style="padding:20px; text-align:center;">
-                    <button class="btn btn-primary" onclick="app.router('login')">ログインして機能を使う</button>
-                </div>
-            `;
-        } else {
-            // User View
-            const { userKeeps, user } = app.state;
-            const appliedIds = user.applied || [];
-            const isKeepTab = app.state.mypageTab === 'keep';
-            
-            const displayJobs = isKeepTab 
-                ? JOBS_DATA.filter(j => userKeeps.includes(String(j.id)))
-                : JOBS_DATA.filter(j => appliedIds.includes(String(j.id)));
-
-            target.innerHTML = `
-                <div class="mypage-header">
-                    <h2 style="font-size:20px; font-weight:bold;">${user.name} さんのマイページ</h2>
-                    <div style="margin-top:10px; font-size:12px; border:1px solid rgba(255,255,255,0.3); display:inline-block; padding:4px 10px; border-radius:15px; cursor:pointer;" onclick="app.logout()">ログアウト</div>
-                </div>
-                <div style="padding:0 16px;">
-                    <div class="mypage-tabs">
-                        <div class="mypage-tab ${isKeepTab?'active':''}" onclick="app.switchMypageTab('keep')">キープ中</div>
-                        <div class="mypage-tab ${!isKeepTab?'active':''}" onclick="app.switchMypageTab('history')">応募履歴</div>
-                    </div>
-                    <div class="job-list">
-                        ${displayJobs.length ? displayJobs.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人はありません</p>'}
-                    </div>
-                </div>
-            `;
-        }
-    },
-
-    switchMypageTab: (tab) => {
-        app.state.mypageTab = tab;
-        app.renderMypage(document.getElementById('main-content'));
     },
 
     renderAuthPage: (target, type) => {
