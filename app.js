@@ -75,7 +75,6 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
-// --- Utils ---
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
@@ -95,7 +94,6 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
-// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
     for (let i = 1; i <= count; i++) {
@@ -170,11 +168,10 @@ const app = {
         guestKeeps: [],
         guestApplied: [],
         mypageTab: 'keep',
-        isModalSearchMode: false // ★追加: モーダルが検索モードかどうか
+        isModalSearchMode: false 
     },
 
     init: async () => {
-        // ★★★ モーダル初期化 (ボタンにID付与) ★★★
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button id="modal-decide-btn" class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
@@ -219,9 +216,12 @@ const app = {
                 if (!response.ok) throw new Error('Network error');
                 const text = await response.text();
                 JOBS_DATA = parseCSV(text);
+                // ★★★ データ読み込み完了後、即座に再描画（0件対策） ★★★
+                app.resolveUrlAndRender();
             } catch (e) {
                 console.error("CSV Error:", e);
                 JOBS_DATA = generateJobs(20);
+                app.resolveUrlAndRender();
             }
         }
         document.getElementById('loading-overlay').style.display = 'none';
@@ -431,7 +431,7 @@ const app = {
             <div class="category-list">${TOP_CATEGORIES.map(c => `<div class="category-item" onclick="app.selectCategoryAndOpenModal('${c.id}')"><span class="category-icon">${c.icon}</span> ${c.name}</div>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal(true)">職種をもっと見る</button></div>
             <div class="section-title">人気のこだわり</div>
-            <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.router('list', {tag: ['${t}']})">${t}</span>`).join('')}</div>
+            <div class="tag-cloud">${TAG_GROUPS["給与・特典"].slice(0, 8).map(t => `<span class="tag-pill" onclick="app.selectTagAndOpenModal('${t}')">${t}</span>`).join('')}</div>
             <div class="text-center mt-4 clearfix-container"><button type="button" class="btn-more-link" onclick="app.openConditionModal(true)">こだわりをもっと見る</button></div>
             <div class="section-title">新着求人</div>
             <div class="job-list">${newJobs.map(job => app.createJobCard(job)).join('')}</div>
@@ -447,6 +447,12 @@ const app = {
 
     selectCategoryAndOpenModal: (catId) => {
         app.state.filter.category = [catId];
+        app.openConditionModal(true);
+    },
+
+    // ★★★ 新規追加：タグを選んでモーダルを開く ★★★
+    selectTagAndOpenModal: (tagName) => {
+        app.state.filter.tag = [tagName];
         app.openConditionModal(true);
     },
 
@@ -992,7 +998,7 @@ const app = {
         if(display) {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
-        // リスト画面なら再検索
+        // Top以外なら即検索
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
