@@ -259,7 +259,6 @@ const app = {
         
         container.innerHTML = '';
 
-        // ★★★ 修正: 判定順序を変更（form優先） ★★★
         if (page === 'form') {
             app.renderForm(container);
         } else if (id) {
@@ -620,7 +619,7 @@ const app = {
                     <div class="spec-container"><div class="spec-row"><div class="spec-label">応募方法</div><div class="spec-value">${job.apply_flow || '-'}</div></div><div class="spec-row"><div class="spec-label">選考期間</div><div class="spec-value">${job.process || '-'}</div></div></div>
                 </div>
             </div>
-            <div class="fixed-cta"><button class="btn-fav ${isKeep?'active':''} keep-btn-${job.id}" onclick="app.toggleKeep('${job.id}')">♥</button>${isApplied ? `<button class="btn-apply-lg" style="background:#ccc; box-shadow:none; cursor:default;">応募済み</button>` : `<button class="btn-apply-lg" onclick="app.router('form', '${job.id}')">今すぐ応募する 🚀</button>`}</div>
+            <div class="fixed-cta"><button class="btn-fav ${isKeep?'active':''} keep-btn-${job.id}" onclick="app.toggleKeep('${job.id}')">♥</button>${isApplied ? `<button class="btn-apply-lg" style="background:#ccc; box-shadow:none; cursor:default;">応募済み</button>` : `<button class="btn-apply-lg" onclick="app.router('form', '${job.id}')">応募する</button>`}</div>
         `;
     },
 
@@ -674,7 +673,7 @@ const app = {
                     <br>に同意して
                 </div>
                 
-                <button class="btn btn-accent w-full" onclick="app.submitForm()">下記利用規約・プライバシーポリシーに同意して応募する</button>
+                <button class="btn btn-accent w-full" onclick="app.submitForm()">応募する</button>
             </div>`;
         
         app.restoreFormData();
