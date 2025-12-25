@@ -75,7 +75,6 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
-// --- Utils ---
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
@@ -84,8 +83,6 @@ const getJobImage = (job) => {
     else if(['assembly','metal','press'].includes(catId)) { color = '#0056b3'; icon = '🔧'; }
     else if(['logistics','fork','driver'].includes(catId)) { color = '#ff9800'; icon = '🚜'; }
     else if(['food'].includes(catId)) { color = '#e91e63'; icon = '🍱'; }
-    
-    // 16:9比率
     const svg = `<svg width="640" height="360" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${color}" fill-opacity="0.1"/><text x="50%" y="55%" font-family="Arial" font-size="120" text-anchor="middle" dy=".3em">${icon}</text></svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 };
@@ -97,11 +94,14 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
-// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
+    // 住所のダミーデータ生成用
+    const CITIES = ["新宿区", "横浜市", "名古屋市", "大阪市", "神戸市", "福岡市", "札幌市", "仙台市", "広島市", "京都市"];
+    
     for (let i = 1; i <= count; i++) {
         const pref = PREFS[Math.floor(Math.random() * PREFS.length)];
+        const city = CITIES[Math.floor(Math.random() * CITIES.length)];
         const cat = ALL_CATEGORIES[Math.floor(Math.random() * ALL_CATEGORIES.length)];
         const shuffledTags = [...ALL_TAGS_FLAT].sort(() => 0.5 - Math.random());
         const myTags = shuffledTags.slice(0, Math.floor(Math.random() * 4) + 2);
@@ -111,14 +111,16 @@ const generateJobs = (count) => {
             id: i,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
             company: `${pref}マニュファクチャリング ${i}工場`,
-            pref: pref, category: cat.id, salaryVal: hourly,
+            pref: pref, 
+            city: city, // ★市区町村を追加
+            category: cat.id, salaryVal: hourly,
             salary: `時給 ${hourly.toLocaleString()}円〜`,
             salarySupp: "入社祝い金あり",
             monthlyIncome: `${Math.floor(hourly * 168 / 10000)}万円〜`,
             tags: [...new Set(myTags)],
             type: type,
             isNew: i <= 25,
-            desc: `${pref}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
+            desc: `${pref}${city}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
             flow: "8:00〜17:00 (実働8h)",
             holidays: "土日休み（会社カレンダーによる）",
             benefits: "社会保険完備、有給休暇、制服貸与",
@@ -176,6 +178,15 @@ const app = {
     },
 
     init: async () => {
+        // ★★★ スマホの拡大（ピンチアウト）を防止してレイアウト崩れを防ぐ設定 ★★★
+        let viewport = document.querySelector('meta[name="viewport"]');
+        if (!viewport) {
+            viewport = document.createElement('meta');
+            viewport.name = "viewport";
+            document.head.appendChild(viewport);
+        }
+        viewport.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
+
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button id="modal-decide-btn" class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
@@ -247,7 +258,6 @@ const app = {
         container.innerHTML = '';
 
         if (id) {
-            // ★★★ 修正: parseIntを削除し、IDをそのまま渡す ★★★
             app.renderDetail(container, id); 
         } else if (page === 'list') {
             app.renderList(container);
@@ -462,23 +472,24 @@ const app = {
         app.openConditionModal(true);
     },
 
+    // ★★★ 修正: IDを文字列として確実に渡す＆親のonclick廃止でボタンの競合を防ぐ ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         return `
-            <div class="job-card" onclick="app.router('detail', '${job.id}')">
-                <div style="position:relative;">
+            <div class="job-card">
+                <div style="position:relative;" onclick="app.router('detail', '${job.id}')">
                     <img src="${getJobImage(job)}" class="job-card-img" loading="lazy">
                     <div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep('${job.id}')">♥</div>
                 </div>
                 <div class="job-card-body">
-                    <div class="job-card-title">${job.title}</div>
-                    <div class="job-info-row"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
-                    <div class="job-info-row"><span>📍</span> ${job.pref} &nbsp; <span>🏭</span> ${getCategoryName(job.category)}</div>
-                    <div class="job-info-row"><span>💼</span> ${job.type}</div>
-                    <div style="margin-top:8px;">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                    <div class="job-card-title" onclick="app.router('detail', '${job.id}')">${job.title}</div>
+                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
+                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span>📍</span> ${job.pref}${job.city || ''} &nbsp; <span>🏭</span> ${getCategoryName(job.category)}</div>
+                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span>💼</span> ${job.type}</div>
+                    <div style="margin-top:8px;" onclick="app.router('detail', '${job.id}')">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
                     <div class="job-card-actions">
-                        <button type="button" class="btn btn-outline btn-card" onclick="event.stopPropagation(); app.router('detail', '${job.id}')">詳細</button>
-                        <button type="button" class="btn btn-accent btn-card" onclick="event.stopPropagation(); app.router('form', '${job.id}')">応募する</button>
+                        <button type="button" class="btn btn-outline btn-card" onclick="app.router('detail', '${job.id}')">詳細</button>
+                        <button type="button" class="btn btn-accent btn-card" onclick="app.router('form', '${job.id}')">応募する</button>
                     </div>
                 </div>
             </div>
@@ -571,14 +582,14 @@ const app = {
             <div class="detail-tabs"><div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div><div class="detail-tab-item" onclick="app.switchDetailTab(1)">特徴・選考</div></div>
             <div class="detail-padding">
                 <div id="tab-info" class="tab-content">
-                    <div class="detail-summary-card"><div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div><div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}</span></div><div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div></div>
+                    <div class="detail-summary-card"><div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div><div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}${job.city || ''}</span></div><div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div></div>
                     <div class="spec-header">仕事内容</div><div class="detail-description">${job.desc}</div>
                     <div class="spec-header">募集要項</div>
                     <div class="spec-container">
                         <div class="spec-row"><div class="spec-label">給与</div><div class="spec-value">${job.salary}</div></div>
                         <div class="spec-row"><div class="spec-label">給与詳細</div><div class="spec-value">${job.monthlyIncome}${job.salarySupp ? '\n' + job.salarySupp : ''}</div></div>
                         <div class="spec-row"><div class="spec-label">交通費</div><div class="spec-value">${job.transport || '全額支給'}</div></div>
-                        <div class="spec-row"><div class="spec-label">勤務地</div><div class="spec-value">${job.pref}</div></div>
+                        <div class="spec-row"><div class="spec-label">勤務地</div><div class="spec-value">${job.pref}${job.city || ''}</div></div>
                         <div class="spec-row"><div class="spec-label">最寄駅</div><div class="spec-value">${job.station || '-'}</div></div>
                         <div class="spec-row"><div class="spec-label">勤務時間</div><div class="spec-value">${job.flow}</div></div>
                         <div class="spec-row"><div class="spec-label">休日・休暇</div><div class="spec-value">${job.holidays || '-'}</div></div>
@@ -603,6 +614,7 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
+    // ★★★ 応募フォーム (完了メッセージ変更 & バリデーション強化) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
