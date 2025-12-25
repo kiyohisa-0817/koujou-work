@@ -247,7 +247,8 @@ const app = {
         container.innerHTML = '';
 
         if (id) {
-            app.renderDetail(container, parseInt(id));
+            // ★★★ 修正: parseIntを削除し、IDをそのまま渡す ★★★
+            app.renderDetail(container, id); 
         } else if (page === 'list') {
             app.renderList(container);
         } else if (page === 'mypage') {
@@ -273,7 +274,6 @@ const app = {
         let url = window.location.pathname;
         let query = {};
         
-        // ★★★ 修正: ページ遷移時のパラメータ処理 ★★★
         if (pageName === 'detail' && param) {
             query.id = param;
         } else if (pageName === 'form' && param) {
@@ -462,7 +462,6 @@ const app = {
         app.openConditionModal(true);
     },
 
-    // ★★★ 修正: IDを文字列として確実に渡す ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         return `
@@ -566,7 +565,6 @@ const app = {
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
-        // ★★★ 修正: 応募ボタンのID渡しを確実に ★★★
         target.innerHTML = `
             <div style="position:relative;"><button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button><img src="${getJobImage(job)}" class="detail-img-full"></div>
             <div class="detail-header"><div class="detail-tags">${job.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="detail-company">${job.company}</div><div class="detail-title">${job.title}</div></div>
