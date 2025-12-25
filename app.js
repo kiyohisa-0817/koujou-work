@@ -75,9 +75,7 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
-// --- Utils ---
 const getJobImage = (job) => {
-    // image1があればそれを返す、なければデフォルト
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
     let color = '#0056b3', icon = '🏭';
@@ -96,7 +94,6 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
-// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
     const CITIES = ["新宿区", "横浜市", "名古屋市", "大阪市", "神戸市", "福岡市", "札幌市", "仙台市", "広島市", "京都市"];
@@ -109,13 +106,12 @@ const generateJobs = (count) => {
         const myTags = shuffledTags.slice(0, Math.floor(Math.random() * 4) + 2);
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
         const type = EMP_TYPES[i % EMP_TYPES.length];
-        
         data.push({
             id: i,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
             company: `${pref}マニュファクチャリング ${i}工場`,
-            pref: pref,
-            city: city, // 市区町村
+            pref: pref, 
+            city: city,
             category: cat.id, salaryVal: hourly,
             salary: `時給 ${hourly.toLocaleString()}円〜`,
             salarySupp: "入社祝い金あり",
@@ -139,7 +135,6 @@ const generateJobs = (count) => {
     return data;
 };
 
-// ★★★ 修正: スプレッドシートからcity, image2, image3を読み込む ★★★
 const parseCSV = (text) => {
     const arr = [];
     let quote = false; let col = 0, row = 0;
@@ -163,7 +158,6 @@ const parseCSV = (text) => {
         job.idNum = parseInt(job.id) || 0;
         job.salaryVal = parseInt(job.salary.replace(/[^0-9]/g, '')) || 1000;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
-        // city, image2, image3は自動的に取り込まれますが、もし列がない場合は空文字になるように
         job.city = job.city || '';
         job.image2 = job.image2 || '';
         job.image3 = job.image3 || '';
@@ -187,7 +181,6 @@ const app = {
     },
 
     init: async () => {
-        // ★★★ スマホ拡大防止設定 ★★★
         let viewport = document.querySelector('meta[name="viewport"]');
         if (!viewport) {
             viewport = document.createElement('meta');
@@ -266,7 +259,10 @@ const app = {
         
         container.innerHTML = '';
 
-        if (id) {
+        // ★★★ 修正: 判定順序を変更（form優先） ★★★
+        if (page === 'form') {
+            app.renderForm(container);
+        } else if (id) {
             app.renderDetail(container, id); 
         } else if (page === 'list') {
             app.renderList(container);
@@ -276,8 +272,6 @@ const app = {
             app.renderAuthPage(container, 'login');
         } else if (page === 'register') {
             app.renderAuthPage(container, 'register');
-        } else if (page === 'form') {
-            app.renderForm(container);
         } else if (page === 'terms') {
             app.renderTerms(container);
         } else if (page === 'privacy') {
@@ -481,7 +475,6 @@ const app = {
         app.openConditionModal(true);
     },
 
-    // ★★★ 修正: 住所にcityを追加、カード全体クリックを廃止しパーツごとに設定（ボタン反応改善） ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         return `
@@ -567,8 +560,6 @@ const app = {
         const container = document.getElementById('list-container');
         const { pref, tag, category, sort, type } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
-            // ★★★ 修正: 都道府県検索ロジック ★★★
-            // j.pref（例: 東京都）と j.city（例: 新宿区）は別れているので、prefだけで完全一致判定
             if (pref && j.pref !== pref) return false;
             
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
@@ -581,7 +572,6 @@ const app = {
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
-    // ★★★ 修正: 画像3枚表示対応 & city表示 ★★★
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) { target.innerHTML = '<p class="text-center mt-4">求人が見つかりません</p>'; return; }
@@ -589,7 +579,6 @@ const app = {
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
-        // 画像HTML生成（横スクロールコンテナ）
         let imagesHtml = `<img src="${getJobImage(job)}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
         if (job.image2 && job.image2.startsWith('http')) {
             imagesHtml += `<img src="${job.image2}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
@@ -988,6 +977,8 @@ const app = {
 
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); },
 
+    updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.resolveUrlAndRender(); },
+
     closeConditionModal: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
@@ -1107,9 +1098,7 @@ const app = {
         body.innerHTML = `${prefHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${typeHtml}${tagsHtml}`;
         modal.classList.add('active');
         app.updateModalChips();
-    },
-
-    updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.resolveUrlAndRender(); }
+    }
 };
 
 window.app = app;
