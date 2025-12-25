@@ -247,7 +247,7 @@ const app = {
         container.innerHTML = '';
 
         if (id) {
-            app.renderDetail(container, id); // IDは文字列として渡す
+            app.renderDetail(container, parseInt(id));
         } else if (page === 'list') {
             app.renderList(container);
         } else if (page === 'mypage') {
@@ -273,14 +273,14 @@ const app = {
         let url = window.location.pathname;
         let query = {};
         
+        // ★★★ 修正: ページ遷移時のパラメータ処理 ★★★
         if (pageName === 'detail' && param) {
+            query.id = param;
+        } else if (pageName === 'form' && param) {
+            query.page = 'form';
             query.id = param;
         } else if (pageName !== 'top') {
             query.page = pageName;
-            // ★★★ 修正: formへの遷移時もIDを保持する ★★★
-            if (pageName === 'form' && param) {
-                query.id = param;
-            }
         }
 
         const queryString = new URLSearchParams(query).toString();
