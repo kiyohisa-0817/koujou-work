@@ -75,7 +75,9 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
+// --- Utils ---
 const getJobImage = (job) => {
+    // image1があればそれを返す、なければデフォルト
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
     let color = '#0056b3', icon = '🏭';
@@ -94,9 +96,9 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
+// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
-    // 住所のダミーデータ生成用
     const CITIES = ["新宿区", "横浜市", "名古屋市", "大阪市", "神戸市", "福岡市", "札幌市", "仙台市", "広島市", "京都市"];
     
     for (let i = 1; i <= count; i++) {
@@ -107,12 +109,13 @@ const generateJobs = (count) => {
         const myTags = shuffledTags.slice(0, Math.floor(Math.random() * 4) + 2);
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
         const type = EMP_TYPES[i % EMP_TYPES.length];
+        
         data.push({
             id: i,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
             company: `${pref}マニュファクチャリング ${i}工場`,
-            pref: pref, 
-            city: city, // ★市区町村を追加
+            pref: pref,
+            city: city, // 市区町村
             category: cat.id, salaryVal: hourly,
             salary: `時給 ${hourly.toLocaleString()}円〜`,
             salarySupp: "入社祝い金あり",
@@ -136,6 +139,7 @@ const generateJobs = (count) => {
     return data;
 };
 
+// ★★★ 修正: スプレッドシートからcity, image2, image3を読み込む ★★★
 const parseCSV = (text) => {
     const arr = [];
     let quote = false; let col = 0, row = 0;
@@ -159,6 +163,11 @@ const parseCSV = (text) => {
         job.idNum = parseInt(job.id) || 0;
         job.salaryVal = parseInt(job.salary.replace(/[^0-9]/g, '')) || 1000;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
+        // city, image2, image3は自動的に取り込まれますが、もし列がない場合は空文字になるように
+        job.city = job.city || '';
+        job.image2 = job.image2 || '';
+        job.image3 = job.image3 || '';
+        
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
         jobs.push(job);
     }
@@ -178,7 +187,7 @@ const app = {
     },
 
     init: async () => {
-        // ★★★ スマホの拡大（ピンチアウト）を防止してレイアウト崩れを防ぐ設定 ★★★
+        // ★★★ スマホ拡大防止設定 ★★★
         let viewport = document.querySelector('meta[name="viewport"]');
         if (!viewport) {
             viewport = document.createElement('meta');
@@ -472,7 +481,7 @@ const app = {
         app.openConditionModal(true);
     },
 
-    // ★★★ 修正: IDを文字列として確実に渡す＆親のonclick廃止でボタンの競合を防ぐ ★★★
+    // ★★★ 修正: 住所にcityを追加、カード全体クリックを廃止しパーツごとに設定（ボタン反応改善） ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         return `
@@ -484,7 +493,7 @@ const app = {
                 <div class="job-card-body">
                     <div class="job-card-title" onclick="app.router('detail', '${job.id}')">${job.title}</div>
                     <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
-                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span>📍</span> ${job.pref}${job.city || ''} &nbsp; <span>🏭</span> ${getCategoryName(job.category)}</div>
+                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''} &nbsp; <span>🏭</span> ${getCategoryName(job.category)}</div>
                     <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span>💼</span> ${job.type}</div>
                     <div style="margin-top:8px;" onclick="app.router('detail', '${job.id}')">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
                     <div class="job-card-actions">
@@ -558,7 +567,10 @@ const app = {
         const container = document.getElementById('list-container');
         const { pref, tag, category, sort, type } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
+            // ★★★ 修正: 都道府県検索ロジック ★★★
+            // j.pref（例: 東京都）と j.city（例: 新宿区）は別れているので、prefだけで完全一致判定
             if (pref && j.pref !== pref) return false;
+            
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
             if (category && category.length > 0 && !category.includes(j.category)) return false;
             if (type && type.length > 0 && !type.includes(j.type)) return false;
@@ -569,6 +581,7 @@ const app = {
         container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
     },
 
+    // ★★★ 修正: 画像3枚表示対応 & city表示 ★★★
     renderDetail: (target, id) => {
         const job = JOBS_DATA.find(j => String(j.id) === String(id));
         if (!job) { target.innerHTML = '<p class="text-center mt-4">求人が見つかりません</p>'; return; }
@@ -576,20 +589,34 @@ const app = {
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
+        // 画像HTML生成（横スクロールコンテナ）
+        let imagesHtml = `<img src="${getJobImage(job)}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
+        if (job.image2 && job.image2.startsWith('http')) {
+            imagesHtml += `<img src="${job.image2}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
+        }
+        if (job.image3 && job.image3.startsWith('http')) {
+            imagesHtml += `<img src="${job.image3}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
+        }
+
         target.innerHTML = `
-            <div style="position:relative;"><button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button><img src="${getJobImage(job)}" class="detail-img-full"></div>
+            <div style="position:relative;">
+                <button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button>
+                <div style="display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;">
+                    ${imagesHtml}
+                </div>
+            </div>
             <div class="detail-header"><div class="detail-tags">${job.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="detail-company">${job.company}</div><div class="detail-title">${job.title}</div></div>
             <div class="detail-tabs"><div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div><div class="detail-tab-item" onclick="app.switchDetailTab(1)">特徴・選考</div></div>
             <div class="detail-padding">
                 <div id="tab-info" class="tab-content">
-                    <div class="detail-summary-card"><div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div><div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}${job.city || ''}</span></div><div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div></div>
+                    <div class="detail-summary-card"><div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div><div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}${job.city ? ' ' + job.city : ''}</span></div><div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div></div>
                     <div class="spec-header">仕事内容</div><div class="detail-description">${job.desc}</div>
                     <div class="spec-header">募集要項</div>
                     <div class="spec-container">
                         <div class="spec-row"><div class="spec-label">給与</div><div class="spec-value">${job.salary}</div></div>
                         <div class="spec-row"><div class="spec-label">給与詳細</div><div class="spec-value">${job.monthlyIncome}${job.salarySupp ? '\n' + job.salarySupp : ''}</div></div>
                         <div class="spec-row"><div class="spec-label">交通費</div><div class="spec-value">${job.transport || '全額支給'}</div></div>
-                        <div class="spec-row"><div class="spec-label">勤務地</div><div class="spec-value">${job.pref}${job.city || ''}</div></div>
+                        <div class="spec-row"><div class="spec-label">勤務地</div><div class="spec-value">${job.pref}${job.city ? ' ' + job.city : ''}</div></div>
                         <div class="spec-row"><div class="spec-label">最寄駅</div><div class="spec-value">${job.station || '-'}</div></div>
                         <div class="spec-row"><div class="spec-label">勤務時間</div><div class="spec-value">${job.flow}</div></div>
                         <div class="spec-row"><div class="spec-label">休日・休暇</div><div class="spec-value">${job.holidays || '-'}</div></div>
@@ -614,7 +641,6 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
-    // ★★★ 応募フォーム (完了メッセージ変更 & バリデーション強化) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
@@ -962,7 +988,6 @@ const app = {
 
     toast: (m) => { const e = document.getElementById('toast'); e.innerText = m; e.style.display = 'block'; setTimeout(() => e.style.display = 'none', 2000); },
 
-    // ★★★ 重要：モーダル閉じる処理 ★★★
     closeConditionModal: () => {
         const cats = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
@@ -972,18 +997,14 @@ const app = {
         app.state.filter.tag = tags;
         app.state.filter.type = types;
 
-        // ボタンの表示更新（Topページのみ）
         const btn = document.getElementById('top-condition-btn');
         if(btn) {
              const total = cats.length + tags.length + types.length;
              btn.innerHTML = total > 0 ? `<span>🔍 職種・こだわり (${total}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
         }
         
-        // ★★★ フラグに応じて検索実行するか分岐 ★★★
         if (app.state.isModalSearchMode) {
              app.router('list');
-        } else {
-             // 検索しない場合は閉じるだけ (Topページの表示は上で更新済み)
         }
         document.getElementById('condition-modal').classList.remove('active');
     },
@@ -1013,11 +1034,10 @@ const app = {
         if(display) {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
-        // Top以外なら即検索
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
-        } else if (app.state.isModalSearchMode) { // モーダル内からの遷移なら
+        } else if (app.state.isModalSearchMode) {
              app.openConditionModal(true);
         }
     },
@@ -1048,9 +1068,8 @@ const app = {
         container.innerHTML = html;
     },
 
-    // ★★★ 検索モードフラグを受け取るように変更 ★★★
     openConditionModal: (isSearch = false) => {
-        app.state.isModalSearchMode = isSearch; // フラグ保存
+        app.state.isModalSearchMode = isSearch; 
         
         const modal = document.getElementById('condition-modal');
         const body = document.getElementById('condition-modal-body');
@@ -1058,7 +1077,6 @@ const app = {
         const currentTags = app.state.filter.tag || [];
         const currentTypes = app.state.filter.type || [];
         
-        // ボタン文言変更
         const decideBtn = document.getElementById('modal-decide-btn');
         if(decideBtn) {
             decideBtn.innerText = isSearch ? "この条件で決定して検索" : "この条件で決定";
@@ -1094,7 +1112,6 @@ const app = {
     updateFilterSingle: (key, val) => { app.state.filter[key] = val; app.resolveUrlAndRender(); }
 };
 
-// ★★★ IMPORTANT: Define global app reference immediately ★★★
 window.app = app;
 
 window.addEventListener('popstate', () => {
