@@ -84,7 +84,9 @@ const getJobImage = (job) => {
     else if(['assembly','metal','press'].includes(catId)) { color = '#0056b3'; icon = '🔧'; }
     else if(['logistics','fork','driver'].includes(catId)) { color = '#ff9800'; icon = '🚜'; }
     else if(['food'].includes(catId)) { color = '#e91e63'; icon = '🍱'; }
-    const svg = `<svg width="600" height="400" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${color}" fill-opacity="0.1"/><text x="50%" y="55%" font-family="Arial" font-size="120" text-anchor="middle" dy=".3em">${icon}</text></svg>`;
+    
+    // ★★★ 修正：16:9比率 (width="640" height="360") に変更 ★★★
+    const svg = `<svg width="640" height="360" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${color}" fill-opacity="0.1"/><text x="50%" y="55%" font-family="Arial" font-size="120" text-anchor="middle" dy=".3em">${icon}</text></svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 };
 
@@ -598,6 +600,7 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
+    // ★★★ 応募フォーム (完了メッセージ変更 & バリデーション強化) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
@@ -996,7 +999,7 @@ const app = {
         if(display) {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
-        // Top以外なら即検索
+        // リスト画面なら再検索
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
