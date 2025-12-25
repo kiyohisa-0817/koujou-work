@@ -57,7 +57,8 @@ const TOP_CATEGORIES = ALL_CATEGORIES.slice(0, 8);
 const EMP_TYPES = ["期間工", "派遣社員", "正社員", "アルバイト・パート", "契約社員"];
 
 const TAG_GROUPS = {
-    "給与・特典": ["高収入", "日払い可", "週払い可", "入社祝い金あり", "ボーナスあり", "寮費無料", "交通費全額支給"],
+    // ★★★ 修正: 「寮費無料」を「寮・社宅あり」に変更 ★★★
+    "給与・特典": ["高収入", "日払い可", "週払い可", "入社祝い金あり", "ボーナスあり", "寮・社宅あり", "交通費全額支給"],
     "勤務時間・休日": ["日勤のみ", "夜勤専属", "2交替", "3交替", "土日祝休み", "4勤2休", "残業少なめ", "短時間勤務OK"],
     "職場環境": ["寮完備", "個室寮", "カップル寮", "食堂あり", "空調完備", "車通勤可", "送迎あり", "駅チカ"],
     "応募条件": ["未経験OK", "経験者優遇", "女性活躍", "男性活躍", "ミドル活躍", "シニア活躍", "学歴不問", "友達と応募OK", "カップル応募OK"]
@@ -123,6 +124,8 @@ const generateJobs = (count) => {
             flow: "8:00〜17:00 (実働8h)",
             holidays: "土日休み（会社カレンダーによる）",
             benefits: "社会保険完備、有給休暇、制服貸与",
+            dorm: "寮完備（ワンルーム）",
+            dorm_desc: "テレビ、冷蔵庫、洗濯機完備。即入居可。",
             apply_flow: "応募フォームより応募 → 面接（WEB可） → 採用",
             process: "最短3日で入社可能！",
             transport: "規定内支給",
@@ -161,6 +164,9 @@ const parseCSV = (text) => {
         job.city = job.city || '';
         job.image2 = job.image2 || '';
         job.image3 = job.image3 || '';
+        // ★★★ 新規項目: dorm, dorm_desc ★★★
+        job.dorm = job.dorm || '';
+        job.dorm_desc = job.dorm_desc || '';
         
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
         jobs.push(job);
@@ -610,6 +616,8 @@ const app = {
                         <div class="spec-row"><div class="spec-label">休日・休暇</div><div class="spec-value">${job.holidays || '-'}</div></div>
                         <div class="spec-row"><div class="spec-label">雇用形態</div><div class="spec-value">${job.type}</div></div>
                         <div class="spec-row"><div class="spec-label">応募資格</div><div class="spec-value">${job.qualifications || '未経験歓迎'}</div></div>
+                        <div class="spec-row"><div class="spec-label">寮・社宅</div><div class="spec-value">${job.dorm || '-'}</div></div>
+                        <div class="spec-row"><div class="spec-label">寮の詳細</div><div class="spec-value">${job.dorm_desc || '-'}</div></div>
                     </div>
                 </div>
                 <div id="tab-feature" class="tab-content hidden">
