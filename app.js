@@ -75,6 +75,7 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
+// --- Utils ---
 const getJobImage = (job) => {
     if (job.image1 && job.image1.startsWith('http')) return job.image1;
     const catId = job.category;
@@ -94,6 +95,7 @@ const getCategoryName = (id) => {
 
 let JOBS_DATA = [];
 
+// --- Data Loaders ---
 const generateJobs = (count) => {
     const data = [];
     for (let i = 1; i <= count; i++) {
@@ -216,7 +218,6 @@ const app = {
                 if (!response.ok) throw new Error('Network error');
                 const text = await response.text();
                 JOBS_DATA = parseCSV(text);
-                // ★★★ データ読み込み完了後、即座に再描画（0件対策） ★★★
                 app.resolveUrlAndRender();
             } catch (e) {
                 console.error("CSV Error:", e);
@@ -450,7 +451,6 @@ const app = {
         app.openConditionModal(true);
     },
 
-    // ★★★ 新規追加：タグを選んでモーダルを開く ★★★
     selectTagAndOpenModal: (tagName) => {
         app.state.filter.tag = [tagName];
         app.openConditionModal(true);
@@ -507,7 +507,8 @@ const app = {
 
     handleTopSearch: () => {
         const prefText = document.getElementById('top-pref-display').innerText;
-        const pref = prefText.includes('勤務地') ? '' : prefText.replace('▼','').replace('変更する >','').trim();
+        // ★★★ 修正：アイコン文字「📍」を取り除く ★★★
+        const pref = prefText.includes('勤務地') ? '' : prefText.replace('▼','').replace('変更する >','').replace('📍','').trim();
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
@@ -597,7 +598,6 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
-    // ★★★ 応募フォーム (完了メッセージ変更 & バリデーション強化) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
@@ -661,7 +661,6 @@ const app = {
     },
 
     submitForm: async () => {
-        // ★★★ バリデーション強化 & スクロール ★★★
         const requiredIds = ['inp-name', 'inp-kana', 'inp-tel', 'inp-pref', 'inp-city'];
         const y = document.getElementById('inp-dob-y').value;
         const m = document.getElementById('inp-dob-m').value;
@@ -726,7 +725,6 @@ const app = {
             app.sendToGas(formData);
             sessionStorage.removeItem('temp_form_data');
             
-            // ★★★ 完了メッセージの変更 ★★★
             alert("応募が完了しました。詳細につきまして担当のものからメールかお電話にてご連絡させていただきます。");
             app.router('list');
         } catch (e) { console.error(e); alert("エラー: " + e.message); }
