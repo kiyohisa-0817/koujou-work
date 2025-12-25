@@ -85,7 +85,7 @@ const getJobImage = (job) => {
     else if(['logistics','fork','driver'].includes(catId)) { color = '#ff9800'; icon = '🚜'; }
     else if(['food'].includes(catId)) { color = '#e91e63'; icon = '🍱'; }
     
-    // ★★★ 修正：16:9比率 (width="640" height="360") に変更 ★★★
+    // 16:9比率
     const svg = `<svg width="640" height="360" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="${color}" fill-opacity="0.1"/><text x="50%" y="55%" font-family="Arial" font-size="120" text-anchor="middle" dy=".3em">${icon}</text></svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 };
@@ -247,7 +247,7 @@ const app = {
         container.innerHTML = '';
 
         if (id) {
-            app.renderDetail(container, parseInt(id));
+            app.renderDetail(container, id); // IDは文字列として渡す
         } else if (page === 'list') {
             app.renderList(container);
         } else if (page === 'mypage') {
@@ -277,6 +277,10 @@ const app = {
             query.id = param;
         } else if (pageName !== 'top') {
             query.page = pageName;
+            // ★★★ 修正: formへの遷移時もIDを保持する ★★★
+            if (pageName === 'form' && param) {
+                query.id = param;
+            }
         }
 
         const queryString = new URLSearchParams(query).toString();
@@ -458,13 +462,14 @@ const app = {
         app.openConditionModal(true);
     },
 
+    // ★★★ 修正: IDを文字列として確実に渡す ★★★
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
         return `
-            <div class="job-card" onclick="app.router('detail', ${job.id})">
+            <div class="job-card" onclick="app.router('detail', '${job.id}')">
                 <div style="position:relative;">
                     <img src="${getJobImage(job)}" class="job-card-img" loading="lazy">
-                    <div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep(${job.id})">♥</div>
+                    <div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep('${job.id}')">♥</div>
                 </div>
                 <div class="job-card-body">
                     <div class="job-card-title">${job.title}</div>
@@ -473,8 +478,8 @@ const app = {
                     <div class="job-info-row"><span>💼</span> ${job.type}</div>
                     <div style="margin-top:8px;">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
                     <div class="job-card-actions">
-                        <button class="btn btn-outline btn-card" onclick="event.stopPropagation(); app.router('detail', ${job.id})">詳細</button>
-                        <button class="btn btn-accent btn-card" onclick="event.stopPropagation(); app.router('detail', ${job.id}); setTimeout(()=>app.router('form'), 100);">応募する</button>
+                        <button type="button" class="btn btn-outline btn-card" onclick="event.stopPropagation(); app.router('detail', '${job.id}')">詳細</button>
+                        <button type="button" class="btn btn-accent btn-card" onclick="event.stopPropagation(); app.router('form', '${job.id}')">応募する</button>
                     </div>
                 </div>
             </div>
@@ -509,7 +514,6 @@ const app = {
 
     handleTopSearch: () => {
         const prefText = document.getElementById('top-pref-display').innerText;
-        // ★★★ 修正：アイコン文字「📍」を取り除く ★★★
         const pref = prefText.includes('勤務地') ? '' : prefText.replace('▼','').replace('変更する >','').replace('📍','').trim();
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
@@ -562,6 +566,7 @@ const app = {
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
+        // ★★★ 修正: 応募ボタンのID渡しを確実に ★★★
         target.innerHTML = `
             <div style="position:relative;"><button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button><img src="${getJobImage(job)}" class="detail-img-full"></div>
             <div class="detail-header"><div class="detail-tags">${job.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="detail-company">${job.company}</div><div class="detail-title">${job.title}</div></div>
@@ -590,7 +595,7 @@ const app = {
                     <div class="spec-container"><div class="spec-row"><div class="spec-label">応募方法</div><div class="spec-value">${job.apply_flow || '-'}</div></div><div class="spec-row"><div class="spec-label">選考期間</div><div class="spec-value">${job.process || '-'}</div></div></div>
                 </div>
             </div>
-            <div class="fixed-cta"><button class="btn-fav ${isKeep?'active':''} keep-btn-${job.id}" onclick="app.toggleKeep(${job.id})">♥</button>${isApplied ? `<button class="btn-apply-lg" style="background:#ccc; box-shadow:none; cursor:default;">応募済み</button>` : `<button class="btn-apply-lg" onclick="app.router('form')">今すぐ応募する 🚀</button>`}</div>
+            <div class="fixed-cta"><button class="btn-fav ${isKeep?'active':''} keep-btn-${job.id}" onclick="app.toggleKeep('${job.id}')">♥</button>${isApplied ? `<button class="btn-apply-lg" style="background:#ccc; box-shadow:none; cursor:default;">応募済み</button>` : `<button class="btn-apply-lg" onclick="app.router('form', '${job.id}')">今すぐ応募する 🚀</button>`}</div>
         `;
     },
 
@@ -600,7 +605,6 @@ const app = {
         document.querySelectorAll('.tab-content')[idx].classList.remove('hidden');
     },
 
-    // ★★★ 応募フォーム (完了メッセージ変更 & バリデーション強化) ★★★
     renderForm: (target) => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id') || app.state.detailId; 
@@ -999,7 +1003,7 @@ const app = {
         if(display) {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
-        // リスト画面なら再検索
+        // Top以外なら即検索
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
