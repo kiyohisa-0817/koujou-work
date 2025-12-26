@@ -437,12 +437,11 @@ const app = {
 
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
-        // ★★★ 修正: 求人数を動的に表示 ★★★
         const totalJobs = JOBS_DATA.length;
         target.innerHTML = `
             <div class="hero">
                 <h1>工場・製造業の求人なら<br>工場ワークNAVi</h1>
-                <p>全国${totalJobs}件の求人からあなたにぴったりの求人を見つけよう！</p>
+                <p>全国<span style="color:#ff0000; font-weight:bold; font-size:1.4em;">${totalJobs}件</span>の求人からあなたにぴったりの求人を見つけよう！</p>
                 <div class="search-box">
                     <div class="search-input-area">
                         <button type="button" class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
