@@ -57,7 +57,6 @@ const TOP_CATEGORIES = ALL_CATEGORIES.slice(0, 8);
 const EMP_TYPES = ["期間工", "派遣社員", "正社員", "アルバイト・パート", "契約社員"];
 
 const TAG_GROUPS = {
-    // ★★★ 修正: 「寮費無料」を「寮・社宅あり」に変更 ★★★
     "給与・特典": ["高収入", "日払い可", "週払い可", "入社祝い金あり", "ボーナスあり", "寮・社宅あり", "交通費全額支給"],
     "勤務時間・休日": ["日勤のみ", "夜勤専属", "2交替", "3交替", "土日祝休み", "4勤2休", "残業少なめ", "短時間勤務OK"],
     "職場環境": ["寮完備", "個室寮", "カップル寮", "食堂あり", "空調完備", "車通勤可", "送迎あり", "駅チカ"],
@@ -164,7 +163,6 @@ const parseCSV = (text) => {
         job.city = job.city || '';
         job.image2 = job.image2 || '';
         job.image3 = job.image3 || '';
-        // ★★★ 新規項目: dorm, dorm_desc ★★★
         job.dorm = job.dorm || '';
         job.dorm_desc = job.dorm_desc || '';
         
@@ -439,10 +437,12 @@ const app = {
 
     renderTop: (target) => {
         const newJobs = JOBS_DATA.slice(0, 5);
+        // ★★★ 修正: 求人数を動的に表示 ★★★
+        const totalJobs = JOBS_DATA.length;
         target.innerHTML = `
             <div class="hero">
                 <h1>工場・製造業の求人なら<br>工場ワークNAVi</h1>
-                <p>全国からあなたにぴったりの職場を見つけよう！</p>
+                <p>全国${totalJobs}件の求人からあなたにぴったりの求人を見つけよう！</p>
                 <div class="search-box">
                     <div class="search-input-area">
                         <button type="button" class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
