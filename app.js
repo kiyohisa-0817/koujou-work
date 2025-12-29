@@ -109,7 +109,7 @@ const generateJobs = (count) => {
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
         const type = EMP_TYPES[i % EMP_TYPES.length];
         data.push({
-            id: `JOB-${i}`, // テスト用ID
+            id: `JOB-${i}`,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
             company: `${pref}マニュファクチャリング ${i}工場`,
             pref: pref, 
@@ -158,22 +158,29 @@ const parseCSV = (text) => {
     for(let i=1; i<arr.length; i++) {
         if(arr[i].length < headers.length) continue;
         const job = {};
-        headers.forEach((h, idx) => { job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; });
         
-        // ★★★ 修正: IDの読み取りを強化 (id or ID) ★★★
-        job.id = job.id || job.ID || '';
+        // ★★★ 修正: IDの取得を「A列(インデックス0)」から強制的に取るように変更 ★★★
+        // これで列名が "id" でも "ID" でも "job_id" でも確実に取得できます
+        const rawId = arr[i][0] ? arr[i][0].trim() : ''; 
+        job.id = rawId;
+
+        // 他のデータはヘッダー名で取得
+        headers.forEach((h, idx) => { 
+            // A列以外をマッピング
+            if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; 
+        });
         
         job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
-        job.salaryVal = parseInt(job.salary.replace(/[^0-9]/g, '')) || 1000;
+        job.salaryVal = parseInt((job.salary || '').replace(/[^0-9]/g, '')) || 1000;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
         job.city = job.city || '';
-        job.image2 = job.image2 || '';
-        job.image3 = job.image3 || '';
         job.dorm = job.dorm || '';
         job.dorm_desc = job.dorm_desc || '';
         
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
-        jobs.push(job);
+        
+        // IDがある場合のみ追加
+        if(job.id) jobs.push(job);
     }
     return jobs;
 };
@@ -487,8 +494,9 @@ const app = {
 
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
-        // ★★★ R2 URL生成 & エラー時フォールバック ★★★
-        const imgUrl = `${R2_DOMAIN}/${job.id}_1.jpg`;
+        // ★★★ R2 URL生成 (空白対策) ★★★
+        const cleanId = String(job.id).trim();
+        const imgUrl = `${R2_DOMAIN}/${cleanId}_1.jpg`;
         const fallback = getFallbackImage(job);
         
         return `
@@ -593,13 +601,12 @@ const app = {
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
-        // ★★★ R2 URL生成 (1, 2, 3枚目) ★★★
-        // onerrorでフォールバックまたは非表示に
+        // ★★★ R2 URL生成 (空白対策) ★★★
+        const cleanId = String(job.id).trim();
         const fallback = getFallbackImage(job);
-        let imagesHtml = `<img src="${R2_DOMAIN}/${job.id}_1.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.onerror=null;this.src='${fallback}'">`;
-        // 2枚目、3枚目は画像がなければ非表示(display:none)
-        imagesHtml += `<img src="${R2_DOMAIN}/${job.id}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
-        imagesHtml += `<img src="${R2_DOMAIN}/${job.id}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
+        let imagesHtml = `<img src="${R2_DOMAIN}/${cleanId}_1.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.onerror=null;this.src='${fallback}'">`;
+        imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
+        imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
 
         target.innerHTML = `
             <div style="position:relative;">
@@ -1034,7 +1041,7 @@ const app = {
         document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.selectPref('${p}')">${p}</div>`).join('')}</div>`; 
     },
     
-    // ★★★ 修正: 都道府県選択時に、もし詳細条件モーダルが開いていたら即座に反映 ★★★
+    // ★★★ 修正: 都道府県選択時に、モーダルが開いていれば強制的に再描画 ★★★
     selectPref: (p) => {
         app.state.filter.pref = p;
         app.closeRegionModal();
@@ -1043,14 +1050,15 @@ const app = {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
         
+        // モーダルが開いている場合は、モードに関わらず強制再描画
+        const modal = document.getElementById('condition-modal');
+        if(modal && modal.classList.contains('active')) {
+             app.openConditionModal(app.state.isModalSearchMode);
+        }
+
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
-        } else if (app.state.isModalSearchMode) {
-             // モーダルが開いている場合は再描画して「選択されていません」を更新
-             if(document.getElementById('condition-modal').classList.contains('active')) {
-                 app.openConditionModal(true);
-             }
         }
     },
     
