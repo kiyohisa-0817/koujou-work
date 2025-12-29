@@ -173,6 +173,7 @@ const parseCSV = (text) => {
         job.city = job.city || '';
         job.dorm = job.dorm || '';
         job.dorm_desc = job.dorm_desc || '';
+        job.desc = job.desc || ''; // 仕事内容
         
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
         
@@ -191,7 +192,7 @@ const app = {
         guestApplied: [],
         mypageTab: 'keep',
         isModalSearchMode: false,
-        searchLimit: 20 // ★★★ 初期表示件数 ★★★
+        searchLimit: 20
     },
 
     init: async () => {
@@ -474,7 +475,7 @@ const app = {
                     <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('terms')">利用規約</span>
                     <span style="cursor:pointer; text-decoration:underline;" onclick="app.router('privacy')">プライバシーポリシー</span>
                 </div>
-                <div style="font-size:11px; color:#999;">&copy; 工場ワーク NAVi</div>
+                <div style="font-size:11px; color:#999;">© 工場ワーク NAVi</div>
             </div>
         `;
     },
@@ -504,10 +505,20 @@ const app = {
                 </div>
                 <div class="job-card-body">
                     <div class="job-card-title" onclick="app.router('detail', '${job.id}')">${job.title}</div>
-                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
-                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''} &nbsp; <span>🏭</span> ${getCategoryName(job.category)}</div>
-                    <div class="job-info-row" onclick="app.router('detail', '${job.id}')"><span>💼</span> ${job.type}</div>
-                    <div style="margin-top:8px;" onclick="app.router('detail', '${job.id}')">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                    
+                    <div class="job-info-row"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
+                    
+                    <div class="job-info-row" style="font-weight:bold; color:#333; margin-top:4px;">
+                        <span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''}
+                    </div>
+                    
+                    <div class="job-info-row"><span>🏭</span> ${getCategoryName(job.category)} &nbsp; <span>💼</span> ${job.type}</div>
+                    
+                    <div style="font-size:12px; color:#666; margin:8px 0; line-height:1.4;">
+                        ${job.desc.length > 50 ? job.desc.substring(0, 50) + '...' : job.desc}
+                    </div>
+
+                    <div style="margin-top:4px;" onclick="app.router('detail', '${job.id}')">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
                     <div class="job-card-actions">
                         <button type="button" class="btn btn-outline btn-card" onclick="app.router('detail', '${job.id}')">詳細</button>
                         <button type="button" class="btn btn-accent btn-card" onclick="app.router('form', '${job.id}')">応募する</button>
