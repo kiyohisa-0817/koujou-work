@@ -173,7 +173,7 @@ const parseCSV = (text) => {
         job.city = job.city || '';
         job.dorm = job.dorm || '';
         job.dorm_desc = job.dorm_desc || '';
-        job.desc = job.desc || ''; // 仕事内容
+        job.desc = job.desc || ''; 
         
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
         
@@ -503,8 +503,9 @@ const app = {
                     <img src="${imgUrl}" class="job-card-img" loading="lazy" onerror="this.onerror=null;this.src='${fallback}'">
                     <div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep('${job.id}')">♥</div>
                 </div>
-                <div class="job-card-body">
-                    <div class="job-card-title" onclick="app.router('detail', '${job.id}')">${job.title}</div>
+                
+                <div class="job-card-body" onclick="app.router('detail', '${job.id}')" style="cursor:pointer;">
+                    <div class="job-card-title">${job.title}</div>
                     
                     <div class="job-info-row"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
                     
@@ -512,16 +513,17 @@ const app = {
                         <span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''}
                     </div>
                     
-                    <div class="job-info-row"><span>🏭</span> ${getCategoryName(job.category)} &nbsp; <span>💼</span> ${job.type}</div>
+                    <div class="job-info-row"><span>🏭</span> ${getCategoryName(job.category)}   <span>💼</span> ${job.type}</div>
                     
                     <div style="font-size:12px; color:#666; margin:8px 0; line-height:1.4;">
                         ${job.desc.length > 50 ? job.desc.substring(0, 50) + '...' : job.desc}
                     </div>
 
-                    <div style="margin-top:4px;" onclick="app.router('detail', '${job.id}')">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                    <div style="margin-top:4px;">${job.tags.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('')}</div>
+                    
                     <div class="job-card-actions">
-                        <button type="button" class="btn btn-outline btn-card" onclick="app.router('detail', '${job.id}')">詳細</button>
-                        <button type="button" class="btn btn-accent btn-card" onclick="app.router('form', '${job.id}')">応募する</button>
+                        <button type="button" class="btn btn-outline btn-card" onclick="event.stopPropagation(); app.router('detail', '${job.id}')">詳細</button>
+                        <button type="button" class="btn btn-accent btn-card" onclick="event.stopPropagation(); app.router('form', '${job.id}')">応募する</button>
                     </div>
                 </div>
             </div>
@@ -568,7 +570,7 @@ const app = {
     },
 
     renderList: (target) => {
-        // ★★★ 検索一覧を開くたびに表示件数をリセット ★★★
+        // 検索一覧を開くたびに表示件数をリセット
         app.state.searchLimit = 20;
 
         const { pref, sort, tag, category, type } = app.state.filter;
@@ -604,7 +606,7 @@ const app = {
         
         document.getElementById('result-count').innerHTML = `検索結果：<span>${res.length}</span>件`;
 
-        // ★★★ 続きを見る機能の実装 ★★★
+        // 続きを見る機能の実装
         const currentLimit = app.state.searchLimit || 20;
         const displayedItems = res.slice(0, currentLimit);
         
@@ -624,7 +626,7 @@ const app = {
         container.innerHTML = listHtml + moreBtnHtml;
     },
 
-    // ★★★ 続きを見るボタンの処理 ★★★
+    // 続きを見るボタンの処理
     loadMore: () => {
         app.state.searchLimit = (app.state.searchLimit || 20) + 20;
         app.renderListItems();
@@ -643,7 +645,7 @@ const app = {
         imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
         imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
 
-        // ★★★ 住所表示を強化 & Googleマップリンク追加 ★★★
+        // 住所表示を強化 & Googleマップリンク追加
         target.innerHTML = `
             <div style="position:relative;">
                 <button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button>
