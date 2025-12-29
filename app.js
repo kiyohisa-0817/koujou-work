@@ -159,14 +159,11 @@ const parseCSV = (text) => {
         if(arr[i].length < headers.length) continue;
         const job = {};
         
-        // ★★★ 修正: IDの取得を「A列(インデックス0)」から強制的に取るように変更 ★★★
-        // これで列名が "id" でも "ID" でも "job_id" でも確実に取得できます
+        // ID取得 (A列強制)
         const rawId = arr[i][0] ? arr[i][0].trim() : ''; 
         job.id = rawId;
 
-        // 他のデータはヘッダー名で取得
         headers.forEach((h, idx) => { 
-            // A列以外をマッピング
             if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; 
         });
         
@@ -179,7 +176,6 @@ const parseCSV = (text) => {
         
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
         
-        // IDがある場合のみ追加
         if(job.id) jobs.push(job);
     }
     return jobs;
@@ -194,7 +190,8 @@ const app = {
         guestKeeps: [],
         guestApplied: [],
         mypageTab: 'keep',
-        isModalSearchMode: false 
+        isModalSearchMode: false,
+        searchLimit: 20 // ★★★ 初期表示件数 ★★★
     },
 
     init: async () => {
@@ -494,7 +491,7 @@ const app = {
 
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
-        // ★★★ R2 URL生成 (空白対策) ★★★
+        // R2 URL生成 (空白対策)
         const cleanId = String(job.id).trim();
         const imgUrl = `${R2_DOMAIN}/${cleanId}_1.jpg`;
         const fallback = getFallbackImage(job);
@@ -560,6 +557,9 @@ const app = {
     },
 
     renderList: (target) => {
+        // ★★★ 検索一覧を開くたびに表示件数をリセット ★★★
+        app.state.searchLimit = 20;
+
         const { pref, sort, tag, category, type } = app.state.filter;
         const createChipsHtml = (p, cList, tList, tyList) => {
             let chips = [];
@@ -590,8 +590,33 @@ const app = {
             return true;
         });
         if(sort==='salary') res.sort((a,b)=>b.salaryVal-a.salaryVal); else res.sort((a,b)=>b.idNum-a.idNum);
+        
         document.getElementById('result-count').innerHTML = `検索結果：<span>${res.length}</span>件`;
-        container.innerHTML = res.length ? res.slice(0,50).map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
+
+        // ★★★ 続きを見る機能の実装 ★★★
+        const currentLimit = app.state.searchLimit || 20;
+        const displayedItems = res.slice(0, currentLimit);
+        
+        const listHtml = displayedItems.length ? displayedItems.map(job => app.createJobCard(job)).join('') : '<p class="text-center mt-4">該当する求人がありません</p>';
+        
+        let moreBtnHtml = '';
+        if (res.length > currentLimit) {
+            const remaining = res.length - currentLimit;
+            moreBtnHtml = `
+                <div style="text-align:center; margin: 20px 0 40px;">
+                    <button onclick="app.loadMore()" style="background:#fff; border:1px solid #ccc; padding:10px 30px; border-radius:30px; font-weight:bold; color:#333; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+                        続きを見る (${remaining}件) ▼
+                    </button>
+                </div>`;
+        }
+
+        container.innerHTML = listHtml + moreBtnHtml;
+    },
+
+    // ★★★ 続きを見るボタンの処理 ★★★
+    loadMore: () => {
+        app.state.searchLimit = (app.state.searchLimit || 20) + 20;
+        app.renderListItems();
     },
 
     renderDetail: (target, id) => {
@@ -601,13 +626,13 @@ const app = {
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
-        // ★★★ R2 URL生成 (空白対策) ★★★
         const cleanId = String(job.id).trim();
         const fallback = getFallbackImage(job);
         let imagesHtml = `<img src="${R2_DOMAIN}/${cleanId}_1.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.onerror=null;this.src='${fallback}'">`;
         imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
         imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
 
+        // ★★★ 住所表示を強化 & Googleマップリンク追加 ★★★
         target.innerHTML = `
             <div style="position:relative;">
                 <button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button>
@@ -619,7 +644,19 @@ const app = {
             <div class="detail-tabs"><div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div><div class="detail-tab-item" onclick="app.switchDetailTab(1)">特徴・選考</div></div>
             <div class="detail-padding">
                 <div id="tab-info" class="tab-content">
-                    <div class="detail-summary-card"><div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div><div class="summary-row"><span class="summary-icon">📍</span><span class="summary-val">${job.pref}${job.city ? ' ' + job.city : ''}</span></div><div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div></div>
+                    <div class="detail-summary-card">
+                        <div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div>
+                        
+                        <div class="summary-row" style="align-items:flex-start">
+                            <span class="summary-icon">📍</span>
+                            <div style="flex:1">
+                                <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; line-height:1.4;">${job.pref}${job.city ? ' ' + job.city : ''}</div>
+                                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
+                            </div>
+                        </div>
+
+                        <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
+                    </div>
                     <div class="spec-header">仕事内容</div><div class="detail-description">${job.desc}</div>
                     <div class="spec-header">募集要項</div>
                     <div class="spec-container">
@@ -1041,7 +1078,6 @@ const app = {
         document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.selectPref('${p}')">${p}</div>`).join('')}</div>`; 
     },
     
-    // ★★★ 修正: 都道府県選択時に、モーダルが開いていれば強制的に再描画 ★★★
     selectPref: (p) => {
         app.state.filter.pref = p;
         app.closeRegionModal();
@@ -1050,10 +1086,16 @@ const app = {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
         
-        // モーダルが開いている場合は、モードに関わらず強制再描画
-        const modal = document.getElementById('condition-modal');
-        if(modal && modal.classList.contains('active')) {
-             app.openConditionModal(app.state.isModalSearchMode);
+        // モーダルが開いている場合、IDを使って直接書き換える
+        const modalPrefDisplay = document.getElementById('condition-modal-pref-display');
+        if(modalPrefDisplay) {
+            modalPrefDisplay.innerHTML = `${p} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>`;
+        } else {
+            // 見つからない場合は念のため再描画
+            const modal = document.getElementById('condition-modal');
+            if(modal && modal.classList.contains('active')) {
+                 app.openConditionModal(app.state.isModalSearchMode);
+            }
         }
 
         const params = new URLSearchParams(window.location.search);
@@ -1108,10 +1150,11 @@ const app = {
         }
         
         const currentPref = app.state.filter.pref || '';
+        // 都道府県表示部分にID (condition-modal-pref-display) を付与
         const prefHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">📍</span>都道府県</div>
-                <div style="background:#f9f9f9; padding:12px; border-radius:8px; text-align:center; font-weight:bold; color:#555; cursor:pointer;" onclick="app.openRegionModal()">
+                <div id="condition-modal-pref-display" style="background:#f9f9f9; padding:12px; border-radius:8px; text-align:center; font-weight:bold; color:#555; cursor:pointer;" onclick="app.openRegionModal()">
                     ${currentPref || '選択されていません'} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>
                 </div>
             </div>
