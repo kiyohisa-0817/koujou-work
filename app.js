@@ -159,7 +159,11 @@ const parseCSV = (text) => {
         if(arr[i].length < headers.length) continue;
         const job = {};
         headers.forEach((h, idx) => { job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; });
-        job.idNum = parseInt(job.id) || 0;
+        
+        // ★★★ 修正: IDの読み取りを強化 (id or ID) ★★★
+        job.id = job.id || job.ID || '';
+        
+        job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
         job.salaryVal = parseInt(job.salary.replace(/[^0-9]/g, '')) || 1000;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
         job.city = job.city || '';
