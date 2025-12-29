@@ -42,6 +42,8 @@ const db = getFirestore(fbApp);
 // ===============================================
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4Y34AizgsNB9DDQcPN2wGv1KA5VrhAi3fA2wdFkRWNst50HJIun54ZpaSpw8bPvzn/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
+// ★★★ Cloudflare R2 のドメイン ★★★
+const R2_DOMAIN = "https://pub-7087ad3866b640afba0583afd991b1ab.r2.dev";
 
 const ALL_CATEGORIES = [
     { id: 'light', name: '軽作業・検査', icon: '📦' }, { id: 'assembly', name: '組立・加工', icon: '🔧' }, { id: 'logistics', name: '物流・運搬', icon: '🚜' },
@@ -57,7 +59,6 @@ const TOP_CATEGORIES = ALL_CATEGORIES.slice(0, 8);
 const EMP_TYPES = ["期間工", "派遣社員", "正社員", "アルバイト・パート", "契約社員"];
 
 const TAG_GROUPS = {
-    // ★★★ 修正: 「寮・社宅あり」を削除 ★★★
     "給与・特典": ["高収入", "日払い可", "週払い可", "入社祝い金あり", "ボーナスあり", "交通費全額支給"],
     "勤務時間・休日": ["日勤のみ", "夜勤専属", "2交替", "3交替", "土日祝休み", "4勤2休", "残業少なめ", "短時間勤務OK"],
     "職場環境": ["寮完備", "個室寮", "カップル寮", "食堂あり", "空調完備", "車通勤可", "送迎あり", "駅チカ"],
@@ -76,8 +77,8 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
-const getJobImage = (job) => {
-    if (job.image1 && job.image1.startsWith('http')) return job.image1;
+// 画像読み込み失敗時のダミー画像生成
+const getFallbackImage = (job) => {
     const catId = job.category;
     let color = '#0056b3', icon = '🏭';
     if(['light','clean'].includes(catId)) { color = '#28a745'; icon = '📦'; }
@@ -108,7 +109,7 @@ const generateJobs = (count) => {
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
         const type = EMP_TYPES[i % EMP_TYPES.length];
         data.push({
-            id: i,
+            id: `JOB-${i}`, // テスト用ID
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
             company: `${pref}マニュファクチャリング ${i}工場`,
             pref: pref, 
@@ -482,10 +483,14 @@ const app = {
 
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
+        // ★★★ R2 URL生成 & エラー時フォールバック ★★★
+        const imgUrl = `${R2_DOMAIN}/${job.id}_1.jpg`;
+        const fallback = getFallbackImage(job);
+        
         return `
             <div class="job-card">
                 <div style="position:relative;" onclick="app.router('detail', '${job.id}')">
-                    <img src="${getJobImage(job)}" class="job-card-img" loading="lazy">
+                    <img src="${imgUrl}" class="job-card-img" loading="lazy" onerror="this.onerror=null;this.src='${fallback}'">
                     <div class="keep-mark ${isKeep?'active':''} keep-btn-${job.id}" onclick="event.stopPropagation(); app.toggleKeep('${job.id}')">♥</div>
                 </div>
                 <div class="job-card-body">
@@ -584,13 +589,13 @@ const app = {
         const appliedList = app.state.user ? (app.state.user.applied || []) : (app.state.guestApplied || []);
         const isApplied = appliedList.includes(String(job.id));
         
-        let imagesHtml = `<img src="${getJobImage(job)}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
-        if (job.image2 && job.image2.startsWith('http')) {
-            imagesHtml += `<img src="${job.image2}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
-        }
-        if (job.image3 && job.image3.startsWith('http')) {
-            imagesHtml += `<img src="${job.image3}" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;">`;
-        }
+        // ★★★ R2 URL生成 (1, 2, 3枚目) ★★★
+        // onerrorでフォールバックまたは非表示に
+        const fallback = getFallbackImage(job);
+        let imagesHtml = `<img src="${R2_DOMAIN}/${job.id}_1.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.onerror=null;this.src='${fallback}'">`;
+        // 2枚目、3枚目は画像がなければ非表示(display:none)
+        imagesHtml += `<img src="${R2_DOMAIN}/${job.id}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
+        imagesHtml += `<img src="${R2_DOMAIN}/${job.id}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
 
         target.innerHTML = `
             <div style="position:relative;">
@@ -1025,6 +1030,7 @@ const app = {
         document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.selectPref('${p}')">${p}</div>`).join('')}</div>`; 
     },
     
+    // ★★★ 修正: 都道府県選択時に、もし詳細条件モーダルが開いていたら即座に反映 ★★★
     selectPref: (p) => {
         app.state.filter.pref = p;
         app.closeRegionModal();
@@ -1032,11 +1038,15 @@ const app = {
         if(display) {
             display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
+        
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
         } else if (app.state.isModalSearchMode) {
-             app.openConditionModal(true);
+             // モーダルが開いている場合は再描画して「選択されていません」を更新
+             if(document.getElementById('condition-modal').classList.contains('active')) {
+                 app.openConditionModal(true);
+             }
         }
     },
     
