@@ -597,17 +597,20 @@ const app = {
                 <div class="job-card-body" onclick="app.router('detail', '${job.id}')" style="cursor:pointer;">
                     <div class="job-card-title">${job.title}</div>
                     
-                    <div class="job-info-row" style="font-size:12px; color:#666; margin-top:4px;">
+                    <div class="job-info-row" style="font-size:14px; font-weight:bold; color:#333; margin-top:4px;">
                         <span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''}
                     </div>
 
-                    <div class="job-info-row" style="margin-bottom:2px;"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
+                    <div class="job-info-row" style="margin-bottom:2px; display:flex; align-items:center;">
+                        <span style="margin-right:8px; display:flex; align-items:center;">💴</span>
+                        <span class="salary-text" style="display:flex; align-items:center;">${job.salary}</span>
+                    </div>
                     
                     <div style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
                         ${job.monthlyIncome}${job.salarySupp ? ' / ' + job.salarySupp : ''}
                     </div>
 
-                    <div class="job-info-row" style="font-size:12px; color:#666; margin-bottom:2px;">
+                    <div class="job-info-row" style="font-size:13px; font-weight:bold; color:#333; margin-bottom:2px;">
                         <span>🏭</span> ${getCategoryName(job.category)}   <span>💼</span> ${job.type}
                     </div>
                     
@@ -1350,7 +1353,6 @@ const app = {
             </div>
         `;
 
-        // ★★★ 給与選択ロジック（どれか1つを選択したら他をクリア） ★★★
         const salaryHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">💰</span>給与・収入（下限）</div>
