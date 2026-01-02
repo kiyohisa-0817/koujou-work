@@ -597,19 +597,21 @@ const app = {
                 <div class="job-card-body" onclick="app.router('detail', '${job.id}')" style="cursor:pointer;">
                     <div class="job-card-title">${job.title}</div>
                     
-                    <div class="job-info-row"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
+                    <div class="job-info-row" style="font-size:12px; color:#666; margin-top:4px;">
+                        <span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''}
+                    </div>
+
+                    <div class="job-info-row" style="margin-bottom:2px;"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
                     
-                    <div style="font-size:12px; color:#666; margin:4px 0 8px; line-height:1.4;">
+                    <div style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
                         ${job.monthlyIncome}${job.salarySupp ? ' / ' + job.salarySupp : ''}
                     </div>
 
-                    <div class="job-info-row" style="font-weight:bold; color:#333; margin-top:4px;">
-                        <span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''}
+                    <div class="job-info-row" style="font-size:12px; color:#666; margin-bottom:2px;">
+                        <span>🏭</span> ${getCategoryName(job.category)}   <span>💼</span> ${job.type}
                     </div>
                     
-                    <div class="job-info-row"><span>🏭</span> ${getCategoryName(job.category)}   <span>💼</span> ${job.type}</div>
-                    
-                    <div style="font-size:12px; color:#666; margin:8px 0; line-height:1.4;">
+                    <div style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
                         ${job.desc.length > 50 ? job.desc.substring(0, 50) + '...' : job.desc}
                     </div>
 
