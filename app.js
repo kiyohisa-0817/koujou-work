@@ -171,10 +171,22 @@ const parseCSV = (text) => {
             if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; 
         });
         
+        const rawSalaryStr = job.salary || '';
+        const rawSalaryNum = parseInt(rawSalaryStr.replace(/[^0-9]/g, '')) || 0;
+
+        if (rawSalaryStr.indexOf('月給') !== -1 || rawSalaryStr.indexOf('月収') !== -1) {
+            let monthlyYen = rawSalaryNum;
+            if(monthlyYen < 1000) monthlyYen = monthlyYen * 10000;
+            job.monthlyVal = Math.floor(monthlyYen / 10000); 
+            job.salaryVal = Math.floor(monthlyYen / 168);    
+            job.annualVal = job.monthlyVal * 12;             
+        } else {
+            job.salaryVal = rawSalaryNum || 1000;
+            job.monthlyVal = Math.floor(job.salaryVal * 168 / 10000);
+            job.annualVal = job.monthlyVal * 12;
+        }
+
         job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
-        job.salaryVal = parseInt((job.salary || '').replace(/[^0-9]/g, '')) || 1000;
-        job.monthlyVal = Math.floor(job.salaryVal * 168 / 10000);
-        job.annualVal = job.monthlyVal * 12;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
         job.city = job.city || '';
         job.dorm = job.dorm || '';
@@ -193,7 +205,7 @@ const app = {
     state: {
         filter: { 
             pref: '', 
-            city: [], // ★★★ 市区町村フィルタ追加 ★★★
+            city: [], 
             tag: [], 
             category: [], 
             sort: 'new', 
@@ -246,7 +258,7 @@ const app = {
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
             const p_pref = params.get('pref');
-            const p_city = params.get('city'); // ★
+            const p_city = params.get('city'); 
             const p_cat = params.get('category');
             const p_tag = params.get('tag');
             const p_type = params.get('type');
@@ -256,7 +268,7 @@ const app = {
             const p_annual = params.get('annualMin');
 
             if (p_pref) app.state.filter.pref = p_pref;
-            if (p_city) app.state.filter.city = p_city.split(','); // ★
+            if (p_city) app.state.filter.city = p_city.split(','); 
             if (p_cat) app.state.filter.category = p_cat.split(',');
             if (p_tag) app.state.filter.tag = p_tag.split(',');
             if (p_type) app.state.filter.type = p_type.split(',');
@@ -375,7 +387,7 @@ const app = {
             query.page = 'list';
             const f = app.state.filter;
             if (f.pref) query.pref = f.pref;
-            if (f.city && f.city.length) query.city = f.city.join(','); // ★
+            if (f.city && f.city.length) query.city = f.city.join(','); 
             if (f.category && f.category.length) query.category = f.category.join(',');
             if (f.tag && f.tag.length) query.tag = f.tag.join(',');
             if (f.type && f.type.length) query.type = f.type.join(',');
@@ -535,6 +547,7 @@ const app = {
                     <div class="search-input-area">
                         <button type="button" class="search-input-btn" id="top-pref-display" onclick="app.openRegionModal()">勤務地を選択<span>▼</span></button>
                         <button type="button" class="search-input-btn" id="top-condition-btn" onclick="app.openConditionModal(false)">職種・こだわり条件を選択<span>▼</span></button>
+                        <button type="button" class="search-input-btn" id="top-salary-btn" onclick="app.openConditionModal(false)">💰 給料から選択<span>▼</span></button>
                     </div>
                     <button type="button" class="btn-search" onclick="app.handleTopSearch()">検索</button>
                 </div>
@@ -586,6 +599,10 @@ const app = {
                     
                     <div class="job-info-row"><span style="margin-right:8px">💴</span><span class="salary-text">${job.salary}</span></div>
                     
+                    <div style="font-size:12px; color:#666; margin:4px 0 8px; line-height:1.4;">
+                        ${job.monthlyIncome}${job.salarySupp ? ' / ' + job.salarySupp : ''}
+                    </div>
+
                     <div class="job-info-row" style="font-weight:bold; color:#333; margin-top:4px;">
                         <span>📍</span> ${job.pref}${job.city ? ' ' + job.city : ''}
                     </div>
@@ -655,7 +672,6 @@ const app = {
             let chips = [];
             if (p) chips.push(`<div class="filter-chip">📍 ${p} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('pref', '${p}')">×</div></div>`);
             
-            // ★★★ 市区町村チップの表示 ★★★
             if(cityList && cityList.length > 0) {
                 cityList.forEach(ct => chips.push(`<div class="filter-chip">🏘️ ${ct} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('city', '${ct}')">×</div></div>`));
             }
@@ -684,8 +700,6 @@ const app = {
         const { pref, tag, category, sort, type, salaryMin, monthlyMin, annualMin, city } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
             if (pref && j.pref !== pref) return false;
-            
-            // ★★★ 市区町村フィルタロジック ★★★
             if (city && city.length > 0 && !city.includes(j.city)) return false;
 
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
@@ -747,7 +761,9 @@ const app = {
                 </div>
             </div>
             <div class="detail-header"><div class="detail-tags">${job.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div><div class="detail-company">${job.company}</div><div class="detail-title">${job.title}</div></div>
-            <div class="detail-tabs"><div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div><div class="detail-tab-item" onclick="app.switchDetailTab(1)">特徴・選考</div></div>
+            
+            <div class="detail-tabs"><div class="detail-tab-item active" onclick="app.switchDetailTab(0)">募集要項</div><div class="detail-tab-item" onclick="app.switchDetailTab(1)">応募・選考情報</div></div>
+            
             <div class="detail-padding">
                 <div id="tab-info" class="tab-content">
                     <div class="detail-summary-card">
@@ -762,6 +778,10 @@ const app = {
                         <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
                     </div>
                     <div class="spec-header">仕事内容</div><div class="detail-description">${job.desc}</div>
+                    
+                    <div class="spec-header">PRポイント</div><div class="detail-description">${job.points || '特にありません'}</div>
+                    <div class="spec-header">福利厚生</div><div class="detail-description">${job.benefits || '-'}</div>
+
                     <div class="spec-header">募集要項</div>
                     <div class="spec-container">
                         <div class="spec-row"><div class="spec-label">給与</div><div class="spec-value">${job.salary}</div></div>
@@ -778,8 +798,6 @@ const app = {
                     </div>
                 </div>
                 <div id="tab-feature" class="tab-content hidden">
-                    <div class="spec-header">PRポイント</div><div class="detail-description">${job.points || '特にありません'}</div>
-                    <div class="spec-header">福利厚生</div><div class="detail-description">${job.benefits || '-'}</div>
                     <div class="spec-header">応募・選考</div>
                     <div class="spec-container"><div class="spec-row"><div class="spec-label">応募方法</div><div class="spec-value">${job.apply_flow || '-'}</div></div><div class="spec-row"><div class="spec-label">選考期間</div><div class="spec-value">${job.process || '-'}</div></div></div>
                 </div>
@@ -811,6 +829,7 @@ const app = {
                 <p class="mb-4 font-bold">${job ? job.title : ''}</p>
                 <div class="form-section">
                     <div class="form-section-title">応募者情報</div>
+                    
                     <div class="form-group"><label class="form-label">氏名<span class="req">必須</span></label><input type="text" id="inp-name" class="form-input" value="${p.name || ''}" placeholder="例：工場 太郎"></div>
                     <div class="form-group"><label class="form-label">ふりがな<span class="req">必須</span></label><input type="text" id="inp-kana" class="form-input" value="${p.kana || ''}" placeholder="例：こうじょう たろう"></div>
                     <div class="form-group"><label class="form-label">メールアドレス<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input type="email" id="inp-email" class="form-input" value="${p.email || ''}"></div>
@@ -1188,14 +1207,11 @@ const app = {
         document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.renderRegionStep3('${p}')">${p}</div>`).join('')}</div>`; 
     },
 
-    // ★★★ 市区町村選択ステップ (Step 3) ★★★
     renderRegionStep3: (pref) => {
-        // 現在のデータから、その都道府県に含まれる市区町村リストを動的に生成
         const availableCities = [...new Set(JOBS_DATA.filter(j => j.pref === pref && j.city).map(j => j.city))].sort();
         
         document.getElementById('modal-title').innerText = `${pref}の市区町村`; 
         
-        // 戻るボタン + 全域ボタン + 市区町村リスト
         let html = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep2(${REGIONS.findIndex(r => r.prefs.includes(pref))})">戻る</button></div>`;
         
         html += `<div style="margin-bottom:16px;">
@@ -1219,20 +1235,17 @@ const app = {
         document.getElementById('modal-body').innerHTML = html;
     },
 
-    // ★★★ 市区町村選択の適用 ★★★
     applyCitySelection: (pref) => {
         const checked = Array.from(document.querySelectorAll('input[name="city-select"]:checked')).map(el => el.value);
         app.selectCities(pref, checked);
     },
 
-    // ★★★ エリア選択完了処理 ★★★
     selectCities: (pref, cities) => {
         app.state.filter.pref = pref;
-        app.state.filter.city = cities; // 市区町村リストをセット
+        app.state.filter.city = cities; 
         
         app.closeRegionModal();
         
-        // 表示更新
         const display = document.getElementById('top-pref-display');
         let label = pref;
         if(cities.length > 0) label += ` (${cities.length}エリア)`;
@@ -1259,7 +1272,7 @@ const app = {
     removeFilter: (type, val) => {
         if (type === 'pref') {
             app.state.filter.pref = '';
-            app.state.filter.city = []; // 県を解除したら市も解除
+            app.state.filter.city = []; 
         }
         else if (type === 'city') {
             app.state.filter.city = app.state.filter.city.filter(c => c !== val);
@@ -1335,27 +1348,28 @@ const app = {
             </div>
         `;
 
+        // ★★★ 給与選択ロジック（どれか1つを選択したら他をクリア） ★★★
         const salaryHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">💰</span>給与・収入（下限）</div>
                 <div class="cond-grid-selects" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
                     <div>
                         <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">時給</label>
-                        <select name="filter-salary" class="form-input" style="padding:8px;">
+                        <select name="filter-salary" class="form-input" style="padding:8px;" onchange="document.querySelector('select[name=filter-monthly]').value=''; document.querySelector('select[name=filter-annual]').value='';">
                             <option value="">指定なし</option>
                             ${[1000,1100,1200,1300,1400,1500,1600,1800,2000].map(v => `<option value="${v}" ${currentSalary==v?'selected':''}>${v}円~</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">月収(万)</label>
-                        <select name="filter-monthly" class="form-input" style="padding:8px;">
+                        <select name="filter-monthly" class="form-input" style="padding:8px;" onchange="document.querySelector('select[name=filter-salary]').value=''; document.querySelector('select[name=filter-annual]').value='';">
                             <option value="">指定なし</option>
                             ${[20,23,25,28,30,35,40].map(v => `<option value="${v}" ${currentMonthly==v?'selected':''}>${v}万~</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">年収(万)</label>
-                        <select name="filter-annual" class="form-input" style="padding:8px;">
+                        <select name="filter-annual" class="form-input" style="padding:8px;" onchange="document.querySelector('select[name=filter-salary]').value=''; document.querySelector('select[name=filter-monthly]').value='';">
                             <option value="">指定なし</option>
                             ${[300,350,400,450,500,600].map(v => `<option value="${v}" ${currentAnnual==v?'selected':''}>${v}万~</option>`).join('')}
                         </select>
