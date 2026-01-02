@@ -77,7 +77,6 @@ const REGIONS = [
 ];
 const PREFS = REGIONS.flatMap(r => r.prefs);
 
-// 画像読み込み失敗時のダミー画像生成
 const getFallbackImage = (job) => {
     const catId = job.category;
     let color = '#0056b3', icon = '🏭';
@@ -107,17 +106,23 @@ const generateJobs = (count) => {
         const shuffledTags = [...ALL_TAGS_FLAT].sort(() => 0.5 - Math.random());
         const myTags = shuffledTags.slice(0, Math.floor(Math.random() * 4) + 2);
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
+        const monthly = Math.floor(hourly * 168 / 10000);
+        const annual = monthly * 12;
         const type = EMP_TYPES[i % EMP_TYPES.length];
+        
         data.push({
             id: `JOB-${i}`,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
             company: `${pref}マニュファクチャリング ${i}工場`,
             pref: pref, 
             city: city,
-            category: cat.id, salaryVal: hourly,
+            category: cat.id, 
+            salaryVal: hourly,
+            monthlyVal: monthly,
+            annualVal: annual,
             salary: `時給 ${hourly.toLocaleString()}円〜`,
             salarySupp: "入社祝い金あり",
-            monthlyIncome: `${Math.floor(hourly * 168 / 10000)}万円〜`,
+            monthlyIncome: `${monthly}万円〜`,
             tags: [...new Set(myTags)],
             type: type,
             isNew: i <= 25,
@@ -159,7 +164,6 @@ const parseCSV = (text) => {
         if(arr[i].length < headers.length) continue;
         const job = {};
         
-        // ID取得 (A列強制)
         const rawId = arr[i][0] ? arr[i][0].trim() : ''; 
         job.id = rawId;
 
@@ -169,6 +173,8 @@ const parseCSV = (text) => {
         
         job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
         job.salaryVal = parseInt((job.salary || '').replace(/[^0-9]/g, '')) || 1000;
+        job.monthlyVal = Math.floor(job.salaryVal * 168 / 10000);
+        job.annualVal = job.monthlyVal * 12;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
         job.city = job.city || '';
         job.dorm = job.dorm || '';
@@ -185,7 +191,17 @@ const parseCSV = (text) => {
 // --- App Core ---
 const app = {
     state: {
-        filter: { pref: '', tag: [], category: [], sort: 'new', type: [] },
+        filter: { 
+            pref: '', 
+            city: [], // ★★★ 市区町村フィルタ追加 ★★★
+            tag: [], 
+            category: [], 
+            sort: 'new', 
+            type: [],
+            salaryMin: '', 
+            monthlyMin: '', 
+            annualMin: ''   
+        },
         user: null,
         userProfile: {},
         guestKeeps: [],
@@ -218,7 +234,7 @@ const app = {
         const savedState = sessionStorage.getItem('fwn_state');
         if (savedState) {
             const parsed = JSON.parse(savedState);
-            app.state.filter = parsed.filter || app.state.filter;
+            app.state.filter = { ...app.state.filter, ...(parsed.filter || {}) };
             app.state.mypageTab = parsed.mypageTab || 'keep';
         }
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
@@ -226,6 +242,29 @@ const app = {
         
         const savedGuestApplied = localStorage.getItem('factory_work_navi_guest_applied');
         if (savedGuestApplied) app.state.guestApplied = JSON.parse(savedGuestApplied);
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('page') === 'list') {
+            const p_pref = params.get('pref');
+            const p_city = params.get('city'); // ★
+            const p_cat = params.get('category');
+            const p_tag = params.get('tag');
+            const p_type = params.get('type');
+            const p_sort = params.get('sort');
+            const p_salary = params.get('salaryMin');
+            const p_monthly = params.get('monthlyMin');
+            const p_annual = params.get('annualMin');
+
+            if (p_pref) app.state.filter.pref = p_pref;
+            if (p_city) app.state.filter.city = p_city.split(','); // ★
+            if (p_cat) app.state.filter.category = p_cat.split(',');
+            if (p_tag) app.state.filter.tag = p_tag.split(',');
+            if (p_type) app.state.filter.type = p_type.split(',');
+            if (p_sort) app.state.filter.sort = p_sort;
+            if (p_salary) app.state.filter.salaryMin = p_salary;
+            if (p_monthly) app.state.filter.monthlyMin = p_monthly;
+            if (p_annual) app.state.filter.annualMin = p_annual;
+        }
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -257,17 +296,43 @@ const app = {
         }
         document.getElementById('loading-overlay').style.display = 'none';
 
-        const params = new URLSearchParams(window.location.search);
-        const id = params.get('id');
         const page = params.get('page');
-        window.history.replaceState({ id, page }, '', window.location.href);
         app.resolveUrlAndRender();
+    },
+
+    updateTitle: () => {
+        const params = new URLSearchParams(window.location.search);
+        const page = params.get('page');
+        const id = params.get('id');
+        let title = "工場ワークNAVi | 工場・製造業の求人情報";
+
+        if (page === 'list') {
+            const pref = app.state.filter.pref;
+            if (pref) {
+                title = `${pref}の求人一覧 | 工場ワークNAVi`;
+            } else {
+                title = "求人検索結果 | 工場ワークNAVi";
+            }
+        } else if (page === 'detail' || id) {
+            const job = JOBS_DATA.find(j => String(j.id) === String(id));
+            if (job) {
+                title = `${job.title} | 工場ワークNAVi`;
+            }
+        } else if (page === 'form') {
+            title = "応募フォーム | 工場ワークNAVi";
+        } else if (page === 'mypage') {
+            title = "マイページ | 工場ワークNAVi";
+        }
+
+        document.title = title;
     },
 
     resolveUrlAndRender: () => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
         const page = params.get('page');
+
+        app.updateTitle();
 
         const container = document.getElementById('main-content');
         if (!container) return;
@@ -276,7 +341,7 @@ const app = {
 
         if (page === 'form') {
             app.renderForm(container);
-        } else if (id) {
+        } else if (id && page !== 'list') { 
             app.renderDetail(container, id); 
         } else if (page === 'list') {
             app.renderList(container);
@@ -306,6 +371,19 @@ const app = {
         } else if (pageName === 'form' && param) {
             query.page = 'form';
             query.id = param;
+        } else if (pageName === 'list') {
+            query.page = 'list';
+            const f = app.state.filter;
+            if (f.pref) query.pref = f.pref;
+            if (f.city && f.city.length) query.city = f.city.join(','); // ★
+            if (f.category && f.category.length) query.category = f.category.join(',');
+            if (f.tag && f.tag.length) query.tag = f.tag.join(',');
+            if (f.type && f.type.length) query.type = f.type.join(',');
+            if (f.sort !== 'new') query.sort = f.sort;
+            if (f.salaryMin) query.salaryMin = f.salaryMin;
+            if (f.monthlyMin) query.monthlyMin = f.monthlyMin;
+            if (f.annualMin) query.annualMin = f.annualMin;
+
         } else if (pageName !== 'top') {
             query.page = pageName;
         }
@@ -492,7 +570,6 @@ const app = {
 
     createJobCard: (job) => {
         const isKeep = app.state.user ? app.state.userKeeps.includes(String(job.id)) : app.state.guestKeeps.includes(String(job.id));
-        // R2 URL生成 (空白対策)
         const cleanId = String(job.id).trim();
         const imgUrl = `${R2_DOMAIN}/${cleanId}_1.jpg`;
         const fallback = getFallbackImage(job);
@@ -570,21 +647,32 @@ const app = {
     },
 
     renderList: (target) => {
-        // 検索一覧を開くたびに表示件数をリセット
         app.state.searchLimit = 20;
 
-        const { pref, sort, tag, category, type } = app.state.filter;
-        const createChipsHtml = (p, cList, tList, tyList) => {
+        const { pref, sort, tag, category, type, salaryMin, monthlyMin, annualMin, city } = app.state.filter;
+        
+        const createChipsHtml = (p, cList, tList, tyList, sMin, mMin, aMin, cityList) => {
             let chips = [];
             if (p) chips.push(`<div class="filter-chip">📍 ${p} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('pref', '${p}')">×</div></div>`);
+            
+            // ★★★ 市区町村チップの表示 ★★★
+            if(cityList && cityList.length > 0) {
+                cityList.forEach(ct => chips.push(`<div class="filter-chip">🏘️ ${ct} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('city', '${ct}')">×</div></div>`));
+            }
+
             if(cList) cList.forEach(c => chips.push(`<div class="filter-chip">🏭 ${getCategoryName(c)} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('category', '${c}')">×</div></div>`));
             if(tyList) tyList.forEach(t => chips.push(`<div class="filter-chip">💼 ${t} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('type', '${t}')">×</div></div>`));
             if(tList) tList.forEach(t => chips.push(`<div class="filter-chip">🏷️ ${t} <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('tag', '${t}')">×</div></div>`));
+            
+            if(sMin) chips.push(`<div class="filter-chip">💴 時給${sMin}円以上 <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('salaryMin', '')">×</div></div>`);
+            if(mMin) chips.push(`<div class="filter-chip">💴 月収${mMin}万円以上 <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('monthlyMin', '')">×</div></div>`);
+            if(aMin) chips.push(`<div class="filter-chip">💴 年収${aMin}万円以上 <div class="filter-chip-remove" onclick="event.stopPropagation(); app.removeFilter('annualMin', '')">×</div></div>`);
+
             return chips.length > 0 ? `<div class="active-filter-area"><span class="active-filter-label">条件:</span>${chips.join('')}</div>` : '';
         };
         target.innerHTML = `
             <div class="page-header-simple"><button class="back-btn" onclick="app.router('top')">＜</button><div class="page-header-title">求人検索</div><div style="width:40px;"></div></div>
-            <div class="sticky-search-header"><div class="filter-bar"><button type="button" class="filter-toggle-btn" onclick="app.openConditionModal(true)">⚡️ 条件を詳しく絞り込む</button></div><div id="chip-container">${createChipsHtml(pref, category, tag, type)}</div></div>
+            <div class="sticky-search-header"><div class="filter-bar"><button type="button" class="filter-toggle-btn" onclick="app.openConditionModal(true)">⚡️ 条件を詳しく絞り込む</button></div><div id="chip-container">${createChipsHtml(pref, category, tag, type, salaryMin, monthlyMin, annualMin, city)}</div></div>
             <div class="sort-area"><div id="result-count" class="result-count"></div><select id="sort-order" style="border:none; color:#666;" onchange="app.updateFilterSingle('sort', this.value)"><option value="new">新着順</option><option value="salary">給与順</option></select></div>
             <div id="list-container" class="job-list"></div>`;
         document.getElementById('sort-order').value = sort;
@@ -593,20 +681,27 @@ const app = {
 
     renderListItems: () => {
         const container = document.getElementById('list-container');
-        const { pref, tag, category, sort, type } = app.state.filter;
+        const { pref, tag, category, sort, type, salaryMin, monthlyMin, annualMin, city } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
             if (pref && j.pref !== pref) return false;
             
+            // ★★★ 市区町村フィルタロジック ★★★
+            if (city && city.length > 0 && !city.includes(j.city)) return false;
+
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
             if (category && category.length > 0 && !category.includes(j.category)) return false;
             if (type && type.length > 0 && !type.includes(j.type)) return false;
+            
+            if (salaryMin && j.salaryVal < parseInt(salaryMin)) return false;
+            if (monthlyMin && j.monthlyVal < parseInt(monthlyMin)) return false;
+            if (annualMin && j.annualVal < parseInt(annualMin)) return false;
+
             return true;
         });
         if(sort==='salary') res.sort((a,b)=>b.salaryVal-a.salaryVal); else res.sort((a,b)=>b.idNum-a.idNum);
         
         document.getElementById('result-count').innerHTML = `検索結果：<span>${res.length}</span>件`;
 
-        // 続きを見る機能の実装
         const currentLimit = app.state.searchLimit || 20;
         const displayedItems = res.slice(0, currentLimit);
         
@@ -626,7 +721,6 @@ const app = {
         container.innerHTML = listHtml + moreBtnHtml;
     },
 
-    // 続きを見るボタンの処理
     loadMore: () => {
         app.state.searchLimit = (app.state.searchLimit || 20) + 20;
         app.renderListItems();
@@ -645,7 +739,6 @@ const app = {
         imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
         imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
 
-        // 住所表示を強化 & Googleマップリンク追加
         target.innerHTML = `
             <div style="position:relative;">
                 <button class="back-btn" style="position:absolute; top:10px; left:10px; background:rgba(255,255,255,0.8); border-radius:50%; z-index:10;" onclick="app.router('list')">＜</button>
@@ -659,7 +752,6 @@ const app = {
                 <div id="tab-info" class="tab-content">
                     <div class="detail-summary-card">
                         <div class="summary-row"><span class="summary-icon">💴</span><span class="summary-val highlight">${job.salary}</span></div>
-                        
                         <div class="summary-row" style="align-items:flex-start">
                             <span class="summary-icon">📍</span>
                             <div style="flex:1">
@@ -667,7 +759,6 @@ const app = {
                                 <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
                             </div>
                         </div>
-
                         <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
                     </div>
                     <div class="spec-header">仕事内容</div><div class="detail-description">${job.desc}</div>
@@ -720,7 +811,6 @@ const app = {
                 <p class="mb-4 font-bold">${job ? job.title : ''}</p>
                 <div class="form-section">
                     <div class="form-section-title">応募者情報</div>
-                    
                     <div class="form-group"><label class="form-label">氏名<span class="req">必須</span></label><input type="text" id="inp-name" class="form-input" value="${p.name || ''}" placeholder="例：工場 太郎"></div>
                     <div class="form-group"><label class="form-label">ふりがな<span class="req">必須</span></label><input type="text" id="inp-kana" class="form-input" value="${p.kana || ''}" placeholder="例：こうじょう たろう"></div>
                     <div class="form-group"><label class="form-label">メールアドレス<span style="color:#999;font-size:11px;margin-left:4px;">任意</span></label><input type="email" id="inp-email" class="form-input" value="${p.email || ''}"></div>
@@ -1057,13 +1147,20 @@ const app = {
         const tags = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const types = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
         
+        const salary = document.querySelector('select[name="filter-salary"]').value;
+        const monthly = document.querySelector('select[name="filter-monthly"]').value;
+        const annual = document.querySelector('select[name="filter-annual"]').value;
+
         app.state.filter.category = cats;
         app.state.filter.tag = tags;
         app.state.filter.type = types;
+        app.state.filter.salaryMin = salary;
+        app.state.filter.monthlyMin = monthly;
+        app.state.filter.annualMin = annual;
 
         const btn = document.getElementById('top-condition-btn');
         if(btn) {
-             const total = cats.length + tags.length + types.length;
+             const total = cats.length + tags.length + types.length + (salary?1:0) + (monthly?1:0) + (annual?1:0);
              btn.innerHTML = total > 0 ? `<span>🔍 職種・こだわり (${total}件)</span> <span style="color:var(--primary-color)">▼</span>` : `<span>🔍 職種・こだわり条件</span> <span style="color:var(--primary-color)">▼</span>`;
         }
         
@@ -1088,23 +1185,65 @@ const app = {
     renderRegionStep2: (idx) => { 
         const r = REGIONS[idx]; 
         document.getElementById('modal-title').innerText = r.name; 
-        document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.selectPref('${p}')">${p}</div>`).join('')}</div>`; 
+        document.getElementById('modal-body').innerHTML = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep1()">戻る</button></div><div class="pref-grid">${r.prefs.map(p => `<div class="pref-item" onclick="app.renderRegionStep3('${p}')">${p}</div>`).join('')}</div>`; 
     },
-    
-    selectPref: (p) => {
-        app.state.filter.pref = p;
+
+    // ★★★ 市区町村選択ステップ (Step 3) ★★★
+    renderRegionStep3: (pref) => {
+        // 現在のデータから、その都道府県に含まれる市区町村リストを動的に生成
+        const availableCities = [...new Set(JOBS_DATA.filter(j => j.pref === pref && j.city).map(j => j.city))].sort();
+        
+        document.getElementById('modal-title').innerText = `${pref}の市区町村`; 
+        
+        // 戻るボタン + 全域ボタン + 市区町村リスト
+        let html = `<div class="mb-4"><button class="btn btn-sm" onclick="app.renderRegionStep2(${REGIONS.findIndex(r => r.prefs.includes(pref))})">戻る</button></div>`;
+        
+        html += `<div style="margin-bottom:16px;">
+            <button class="btn w-full" style="background:#e3f2fd; color:#0056b3; font-weight:bold; border:none;" onclick="app.selectCities('${pref}', [])">${pref}のすべてのエリア</button>
+        </div>`;
+
+        if (availableCities.length === 0) {
+            html += `<p style="text-align:center; color:#666; padding:20px;">詳細エリア情報がありません</p>`;
+        } else {
+            html += `<div style="max-height:300px; overflow-y:auto; border:1px solid #eee; border-radius:8px; padding:10px;">
+                ${availableCities.map(c => `
+                    <label style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #f0f0f0;">
+                        <input type="checkbox" name="city-select" value="${c}" style="transform:scale(1.2); margin-right:10px;">
+                        <span style="font-size:14px;">${c}</span>
+                    </label>
+                `).join('')}
+            </div>
+            <button class="btn btn-primary w-full mt-4" onclick="app.applyCitySelection('${pref}')">決定して検索</button>`;
+        }
+
+        document.getElementById('modal-body').innerHTML = html;
+    },
+
+    // ★★★ 市区町村選択の適用 ★★★
+    applyCitySelection: (pref) => {
+        const checked = Array.from(document.querySelectorAll('input[name="city-select"]:checked')).map(el => el.value);
+        app.selectCities(pref, checked);
+    },
+
+    // ★★★ エリア選択完了処理 ★★★
+    selectCities: (pref, cities) => {
+        app.state.filter.pref = pref;
+        app.state.filter.city = cities; // 市区町村リストをセット
+        
         app.closeRegionModal();
+        
+        // 表示更新
         const display = document.getElementById('top-pref-display');
+        let label = pref;
+        if(cities.length > 0) label += ` (${cities.length}エリア)`;
         if(display) {
-            display.innerHTML = `<span>📍 ${p}</span> <span style="color:var(--primary-color)">▼</span>`;
+            display.innerHTML = `<span>📍 ${label}</span> <span style="color:var(--primary-color)">▼</span>`;
         }
         
-        // モーダルが開いている場合、IDを使って直接書き換える
         const modalPrefDisplay = document.getElementById('condition-modal-pref-display');
         if(modalPrefDisplay) {
-            modalPrefDisplay.innerHTML = `${p} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>`;
+            modalPrefDisplay.innerHTML = `${label} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>`;
         } else {
-            // 見つからない場合は念のため再描画
             const modal = document.getElementById('condition-modal');
             if(modal && modal.classList.contains('active')) {
                  app.openConditionModal(app.state.isModalSearchMode);
@@ -1118,7 +1257,13 @@ const app = {
     },
     
     removeFilter: (type, val) => {
-        if (type === 'pref') app.state.filter.pref = '';
+        if (type === 'pref') {
+            app.state.filter.pref = '';
+            app.state.filter.city = []; // 県を解除したら市も解除
+        }
+        else if (type === 'city') {
+            app.state.filter.city = app.state.filter.city.filter(c => c !== val);
+        }
         else if (type === 'category') {
             app.state.filter.category = app.state.filter.category.filter(c => c !== val);
         }
@@ -1128,6 +1273,10 @@ const app = {
         else if (type === 'type') {
             app.state.filter.type = app.state.filter.type.filter(t => t !== val);
         }
+        else if (type === 'salaryMin') app.state.filter.salaryMin = '';
+        else if (type === 'monthlyMin') app.state.filter.monthlyMin = '';
+        else if (type === 'annualMin') app.state.filter.annualMin = '';
+
         app.resolveUrlAndRender();
     },
 
@@ -1152,6 +1301,10 @@ const app = {
         const currentTags = app.state.filter.tag || [];
         const currentTypes = app.state.filter.type || [];
         
+        const currentSalary = app.state.filter.salaryMin || '';
+        const currentMonthly = app.state.filter.monthlyMin || '';
+        const currentAnnual = app.state.filter.annualMin || '';
+
         const decideBtn = document.getElementById('modal-decide-btn');
         if(decideBtn) {
             decideBtn.innerText = isSearch ? "この条件で決定して検索" : "この条件で決定";
@@ -1163,12 +1316,14 @@ const app = {
         }
         
         const currentPref = app.state.filter.pref || '';
-        // 都道府県表示部分にID (condition-modal-pref-display) を付与
+        let prefLabel = currentPref || '選択されていません';
+        if(app.state.filter.city && app.state.filter.city.length > 0) prefLabel += ` (${app.state.filter.city.length}エリア)`;
+
         const prefHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">📍</span>都道府県</div>
                 <div id="condition-modal-pref-display" style="background:#f9f9f9; padding:12px; border-radius:8px; text-align:center; font-weight:bold; color:#555; cursor:pointer;" onclick="app.openRegionModal()">
-                    ${currentPref || '選択されていません'} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>
+                    ${prefLabel} <span style="color:var(--primary-color); font-size:12px; margin-left:8px;">変更する ></span>
                 </div>
             </div>
         `;
@@ -1180,7 +1335,36 @@ const app = {
             </div>
         `;
 
-        body.innerHTML = `${prefHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${typeHtml}${tagsHtml}`;
+        const salaryHtml = `
+            <div class="cond-section">
+                <div class="cond-head"><span class="cond-icon">💰</span>給与・収入（下限）</div>
+                <div class="cond-grid-selects" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
+                    <div>
+                        <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">時給</label>
+                        <select name="filter-salary" class="form-input" style="padding:8px;">
+                            <option value="">指定なし</option>
+                            ${[1000,1100,1200,1300,1400,1500,1600,1800,2000].map(v => `<option value="${v}" ${currentSalary==v?'selected':''}>${v}円~</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">月収(万)</label>
+                        <select name="filter-monthly" class="form-input" style="padding:8px;">
+                            <option value="">指定なし</option>
+                            ${[20,23,25,28,30,35,40].map(v => `<option value="${v}" ${currentMonthly==v?'selected':''}>${v}万~</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">年収(万)</label>
+                        <select name="filter-annual" class="form-input" style="padding:8px;">
+                            <option value="">指定なし</option>
+                            ${[300,350,400,450,500,600].map(v => `<option value="${v}" ${currentAnnual==v?'selected':''}>${v}万~</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        body.innerHTML = `${prefHtml}${salaryHtml}<div class="cond-section"><div class="cond-head"><span class="cond-icon">🏭</span>職種</div><div class="cond-grid-modern">${ALL_CATEGORIES.map(c => `<label class="check-btn"><input type="checkbox" name="top-cat" value="${c.id}" ${currentCats.includes(c.id)?'checked':''} onchange="app.updateModalChips()"><span>${c.name}</span></label>`).join('')}</div></div>${typeHtml}${tagsHtml}`;
         modal.classList.add('active');
         app.updateModalChips();
     }
