@@ -1,4 +1,15 @@
 // ===============================================
+// 1. Global Error Handler (安全装置)
+// ===============================================
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error("Critical Error:", message);
+    // エラーが起きてもローディングを消す
+    const loader = document.getElementById('loading-overlay');
+    if(loader) loader.style.display = 'none';
+    return false;
+};
+
+// ===============================================
 // Firebase Integration
 // ===============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -42,7 +53,6 @@ const db = getFirestore(fbApp);
 // ===============================================
 const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz4Y34AizgsNB9DDQcPN2wGv1KA5VrhAi3fA2wdFkRWNst50HJIun54ZpaSpw8bPvzn/exec"; 
 const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSiFBtN5piQfnnlcUtP_2_fVQgRClTvhw-MSMTPUMozsx_6W3-XkHNSnwjU8pRM91SKO6MXxinfo42k/pub?gid=0&single=true&output=csv"; 
-// ★★★ Cloudflare R2 のドメイン ★★★
 const R2_DOMAIN = "https://pub-7087ad3866b640afba0583afd991b1ab.r2.dev";
 
 const ALL_CATEGORIES = [
@@ -64,8 +74,6 @@ const TAG_GROUPS = {
     "職場環境": ["寮完備", "個室寮", "カップル寮", "食堂あり", "空調完備", "車通勤可", "送迎あり", "駅チカ"],
     "応募条件": ["未経験OK", "経験者優遇", "女性活躍", "男性活躍", "ミドル活躍", "シニア活躍", "学歴不問", "友達と応募OK", "カップル応募OK"]
 };
-const ALL_TAGS_FLAT = Object.values(TAG_GROUPS).flat();
-
 const REGIONS = [
     { name: "北海道・東北", icon: "❄️", prefs: ["北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県"] },
     { name: "関東", icon: "🗼", prefs: ["東京都", "神奈川県", "千葉県", "埼玉県", "茨城県", "栃木県", "群馬県"] },
@@ -93,52 +101,36 @@ const getCategoryName = (id) => {
     return c ? c.name : id;
 };
 
-let JOBS_DATA = [];
+// 起動時はまずダミーデータを入れる（これで画面が真っ白になるのを防ぐ）
+let JOBS_DATA = generateJobs(20);
 
-const generateJobs = (count) => {
+function generateJobs(count) {
     const data = [];
     const CITIES = ["新宿区", "横浜市", "名古屋市", "大阪市", "神戸市", "福岡市", "札幌市", "仙台市", "広島市", "京都市"];
-    
     for (let i = 1; i <= count; i++) {
         const pref = PREFS[Math.floor(Math.random() * PREFS.length)];
         const city = CITIES[Math.floor(Math.random() * CITIES.length)];
         const cat = ALL_CATEGORIES[Math.floor(Math.random() * ALL_CATEGORIES.length)];
-        const shuffledTags = [...ALL_TAGS_FLAT].sort(() => 0.5 - Math.random());
+        const shuffledTags = [...Object.values(TAG_GROUPS).flat()].sort(() => 0.5 - Math.random());
         const myTags = shuffledTags.slice(0, Math.floor(Math.random() * 4) + 2);
         const hourly = 1000 + Math.floor(Math.random() * 15) * 100;
         const monthly = Math.floor(hourly * 168 / 10000);
         const annual = monthly * 12;
         const type = EMP_TYPES[i % EMP_TYPES.length];
-        
         data.push({
             id: `JOB-${i}`,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
             company: `${pref}マニュファクチャリング ${i}工場`,
-            pref: pref, 
-            city: city,
-            category: cat.id, 
-            salaryVal: hourly,
-            monthlyVal: monthly,
-            annualVal: annual,
+            pref: pref, city: city, category: cat.id, 
+            salaryVal: hourly, monthlyVal: monthly, annualVal: annual,
             salary: `時給 ${hourly.toLocaleString()}円〜`,
-            salarySupp: "入社祝い金あり",
-            monthlyIncome: `${monthly}万円〜`,
-            tags: [...new Set(myTags)],
-            type: type,
-            isNew: i <= 25,
+            salarySupp: "入社祝い金あり", monthlyIncome: `${monthly}万円〜`,
+            tags: [...new Set(myTags)], type: type, isNew: i <= 25,
             desc: `${pref}${city}エリアの工場で${cat.name}を担当していただきます。マニュアル完備で安心。`,
-            flow: "8:00〜17:00 (実働8h)",
-            holidays: "土日休み（会社カレンダーによる）",
-            benefits: "社会保険完備、有給休暇、制服貸与",
-            dorm: "寮完備（ワンルーム）",
-            dorm_desc: "テレビ、冷蔵庫、洗濯機完備。即入居可。",
-            apply_flow: "応募フォームより応募 → 面接（WEB可） → 採用",
-            process: "最短3日で入社可能！",
-            transport: "規定内支給",
-            station: "駅よりバス15分",
-            style: "立ち仕事",
-            qualifications: "不問",
-            points: "大手企業で長期安定！"
+            flow: "8:00〜17:00 (実働8h)", holidays: "土日休み（会社カレンダーによる）",
+            benefits: "社会保険完備、有給休暇、制服貸与", dorm: "寮完備（ワンルーム）", dorm_desc: "テレビ、冷蔵庫、洗濯機完備。即入居可。",
+            apply_flow: "応募フォームより応募 → 面接（WEB可） → 採用", process: "最短3日で入社可能！",
+            transport: "規定内支給", station: "駅よりバス15分", style: "立ち仕事", qualifications: "不問", points: "大手企業で長期安定！"
         });
     }
     return data;
@@ -163,38 +155,28 @@ const parseCSV = (text) => {
     for(let i=1; i<arr.length; i++) {
         if(arr[i].length < headers.length) continue;
         const job = {};
-        
         const rawId = arr[i][0] ? arr[i][0].trim() : ''; 
         job.id = rawId;
-
-        headers.forEach((h, idx) => { 
-            if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; 
-        });
+        headers.forEach((h, idx) => { if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; });
         
         const rawSalaryStr = job.salary || '';
         const rawSalaryNum = parseInt(rawSalaryStr.replace(/[^0-9]/g, '')) || 0;
-
         if (rawSalaryStr.indexOf('月給') !== -1 || rawSalaryStr.indexOf('月収') !== -1) {
             let monthlyYen = rawSalaryNum;
             if(monthlyYen < 1000) monthlyYen = monthlyYen * 10000;
             job.monthlyVal = Math.floor(monthlyYen / 10000); 
             job.salaryVal = Math.floor(monthlyYen / 168);    
-            job.annualVal = job.monthlyVal * 12;              
+            job.annualVal = job.monthlyVal * 12;             
         } else {
             job.salaryVal = rawSalaryNum || 1000;
             job.monthlyVal = Math.floor(job.salaryVal * 168 / 10000);
             job.annualVal = job.monthlyVal * 12;
         }
-
         job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
-        job.city = job.city || '';
-        job.dorm = job.dorm || '';
-        job.dorm_desc = job.dorm_desc || '';
-        job.desc = job.desc || ''; 
-        
+        job.city = job.city || ''; job.dorm = job.dorm || '';
+        job.dorm_desc = job.dorm_desc || ''; job.desc = job.desc || ''; 
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
-        
         if(job.id) jobs.push(job);
     }
     return jobs;
@@ -203,24 +185,8 @@ const parseCSV = (text) => {
 // --- App Core ---
 const app = {
     state: {
-        filter: { 
-            pref: '', 
-            city: [], 
-            tag: [], 
-            category: [], 
-            sort: 'new', 
-            type: [],
-            salaryMin: '', 
-            monthlyMin: '', 
-            annualMin: ''   
-        },
-        user: null,
-        userProfile: {},
-        guestKeeps: [],
-        guestApplied: [],
-        mypageTab: 'keep',
-        isModalSearchMode: false,
-        searchLimit: 20
+        filter: { pref: '', city: [], tag: [], category: [], sort: 'new', type: [], salaryMin: '', monthlyMin: '', annualMin: '' },
+        user: null, userProfile: {}, guestKeeps: [], guestApplied: [], mypageTab: 'keep', isModalSearchMode: false, searchLimit: 20
     },
 
     init: async () => {
@@ -291,33 +257,27 @@ const app = {
             app.resolveUrlAndRender();
         });
 
+        // ★★★ 改善: まず強制的に画面を表示させる (Render First) ★★★
         app.renderHeader();
-
-        if (GOOGLE_SHEET_CSV_URL) {
-            try {
-                const response = await fetch(GOOGLE_SHEET_CSV_URL);
-                if (!response.ok) throw new Error('Network error');
-                const text = await response.text();
-                JOBS_DATA = parseCSV(text);
-                app.resolveUrlAndRender();
-            } catch (e) {
-                console.error("CSV Error:", e);
-                JOBS_DATA = generateJobs(20);
-                app.resolveUrlAndRender();
-            }
-        }
-        
-        // ★★★ 起動時の「ぐるぐる」対策: 要素チェックと強制非表示 ★★★
-        const loading = document.getElementById('loading-overlay');
-        if (loading) {
-            loading.style.display = 'none';
-        }
-
-        const page = params.get('page');
         app.resolveUrlAndRender();
+        const loader = document.getElementById('loading-overlay');
+        if(loader) loader.style.display = 'none'; // 先に消す
+
+        // ★★★ その後でデータを取得しに行く (Fetch Later) ★★★
+        try {
+            if (GOOGLE_SHEET_CSV_URL) {
+                const response = await fetch(GOOGLE_SHEET_CSV_URL);
+                if (response.ok) {
+                    const text = await response.text();
+                    JOBS_DATA = parseCSV(text);
+                    app.resolveUrlAndRender(); // データ取得後に再描画
+                }
+            }
+        } catch (e) {
+            console.warn("Using Dummy Data due to load error", e);
+        }
     },
 
-    // ★★★ SEO用メタデータ更新関数 ★★★
     updateSeo: () => {
         const params = new URLSearchParams(window.location.search);
         const page = params.get('page');
@@ -349,7 +309,6 @@ const app = {
 
         document.title = title;
         
-        // メタディスクリプションの更新
         let metaDesc = document.querySelector('meta[name="description"]');
         if (!metaDesc) {
             metaDesc = document.createElement('meta');
@@ -364,7 +323,7 @@ const app = {
         const id = params.get('id');
         const page = params.get('page');
 
-        app.updateSeo(); // タイトルと説明文を更新
+        app.updateSeo();
 
         const container = document.getElementById('main-content');
         if (!container) return;
@@ -631,7 +590,7 @@ const app = {
                     </div>
 
                     <div class="job-info-row" style="font-size:13px; font-weight:bold; color:#333; margin-bottom:2px;">
-                        <span>🏭</span> ${getCategoryName(job.category)}    <span>💼</span> ${job.type}
+                        <span>🏭</span> ${getCategoryName(job.category)}   <span>💼</span> ${job.type}
                     </div>
                     
                     <div style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
@@ -675,17 +634,7 @@ const app = {
         }
     },
 
-    // ★★★ 0件バグ修正箇所 ★★★
-    // 画面のテキスト(DOM)ではなく、内部Stateの値を正として検索を実行するよう変更
     handleTopSearch: () => {
-        const prefDisplay = document.getElementById('top-pref-display');
-        // もしユーザーがトップページで「勤務地を選択」の状態（未選択）に戻していたらクリア
-        if (prefDisplay && prefDisplay.innerText.includes('勤務地')) {
-             app.state.filter.pref = '';
-             app.state.filter.city = [];
-        }
-        
-        // カテゴリやタグはチェックボックスから取得してOK
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
@@ -805,7 +754,7 @@ const app = {
                             <span class="summary-icon">📍</span>
                             <div style="flex:1">
                                 <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; line-height:1.4;">${job.pref}${job.city ? ' ' + job.city : ''}</div>
-                                <a href="http://googleusercontent.com/maps.google.com/maps?q=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
+                                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
                             </div>
                         </div>
                         <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
@@ -1274,6 +1223,7 @@ const app = {
     },
 
     selectCities: (pref, cities) => {
+        // ★★★ 改善: 他の条件をリセットして、新しいエリア条件だけで検索する ★★★
         app.state.filter.pref = pref;
         app.state.filter.city = cities; 
         
@@ -1297,6 +1247,8 @@ const app = {
         }
 
         const params = new URLSearchParams(window.location.search);
+        // トップページからなら、その場では飛ばずにstate更新だけ。
+        // リストページなら、即座に反映して再描画
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
         }
@@ -1381,7 +1333,6 @@ const app = {
             </div>
         `;
 
-        // ★★★ 給与選択ロジック ★★★
         const salaryHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">💰</span>給与・収入（下限）</div>
@@ -1428,5 +1379,14 @@ window.addEventListener('pageshow', (event) => {
         app.resolveUrlAndRender();
     }
 });
+
+// ★★★ 安全装置：万が一エラーで止まっても2秒後に強制的にローダーを消す ★★★
+setTimeout(() => {
+    const loader = document.getElementById('loading-overlay');
+    if(loader && loader.style.display !== 'none') {
+        console.warn("Force hiding loader");
+        loader.style.display = 'none';
+    }
+}, 2000);
 
 document.addEventListener('DOMContentLoaded', app.init);
