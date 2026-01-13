@@ -293,26 +293,26 @@ const app = {
 
         app.renderHeader();
 
-        if (GOOGLE_SHEET_CSV_URL) {
-            try {
+        // ★★★ 強力なデータ読み込み & 安全装置 ★★★
+        try {
+            if (GOOGLE_SHEET_CSV_URL) {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
-                if (!response.ok) throw new Error('Network error');
-                const text = await response.text();
-                JOBS_DATA = parseCSV(text);
-                app.resolveUrlAndRender();
-            } catch (e) {
-                console.error("CSV Error:", e);
-                JOBS_DATA = generateJobs(20);
-                app.resolveUrlAndRender();
+                if (response.ok) {
+                    const text = await response.text();
+                    JOBS_DATA = parseCSV(text);
+                } else {
+                    throw new Error('CSV load failed');
+                }
             }
+        } catch (e) {
+            console.error("Data Load Error:", e);
+            JOBS_DATA = generateJobs(20); // フォールバック
+        } finally {
+            // ★★★ どんな状況でも必ずローディングを消す ★★★
+            const loader = document.getElementById('loading-overlay');
+            if(loader) loader.style.display = 'none';
+            app.resolveUrlAndRender();
         }
-        
-        // ★★★ 安全装置：ローディングが終わらない場合、強制的に解除 ★★★
-        const loader = document.getElementById('loading-overlay');
-        if(loader) loader.style.display = 'none';
-
-        const page = params.get('page');
-        app.resolveUrlAndRender();
     },
 
     updateSeo: () => {
@@ -672,7 +672,6 @@ const app = {
     },
 
     handleTopSearch: () => {
-        // ★★★ 修正: 検索ボタン押下時はstateの値をそのまま使う ★★★
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
