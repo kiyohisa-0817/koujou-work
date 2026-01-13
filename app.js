@@ -306,13 +306,18 @@ const app = {
                 app.resolveUrlAndRender();
             }
         }
-        document.getElementById('loading-overlay').style.display = 'none';
+        
+        // ★★★ 起動時の「ぐるぐる」対策: 要素チェックと強制非表示 ★★★
+        const loading = document.getElementById('loading-overlay');
+        if (loading) {
+            loading.style.display = 'none';
+        }
 
         const page = params.get('page');
         app.resolveUrlAndRender();
     },
 
-    // ★★★ SEO用メタデータ更新関数 (機能強化) ★★★
+    // ★★★ SEO用メタデータ更新関数 ★★★
     updateSeo: () => {
         const params = new URLSearchParams(window.location.search);
         const page = params.get('page');
@@ -670,13 +675,17 @@ const app = {
         }
     },
 
+    // ★★★ 0件バグ修正箇所 ★★★
+    // 画面のテキスト(DOM)ではなく、内部Stateの値を正として検索を実行するよう変更
     handleTopSearch: () => {
         const prefDisplay = document.getElementById('top-pref-display');
+        // もしユーザーがトップページで「勤務地を選択」の状態（未選択）に戻していたらクリア
         if (prefDisplay && prefDisplay.innerText.includes('勤務地')) {
              app.state.filter.pref = '';
              app.state.filter.city = [];
         }
         
+        // カテゴリやタグはチェックボックスから取得してOK
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
@@ -796,7 +805,7 @@ const app = {
                             <span class="summary-icon">📍</span>
                             <div style="flex:1">
                                 <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; line-height:1.4;">${job.pref}${job.city ? ' ' + job.city : ''}</div>
-                                <a href="http://maps.google.com/maps?q=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
+                                <a href="http://googleusercontent.com/maps.google.com/maps?q=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
                             </div>
                         </div>
                         <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
@@ -1372,7 +1381,7 @@ const app = {
             </div>
         `;
 
-        // ★★★ 給与選択ロジック（どれか1つを選択したら他をクリア） ★★★
+        // ★★★ 給与選択ロジック ★★★
         const salaryHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">💰</span>給与・収入（下限）</div>
