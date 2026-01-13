@@ -672,6 +672,7 @@ const app = {
     },
 
     handleTopSearch: () => {
+        // ★★★ 修正: 検索ボタン押下時はstateの値をそのまま使う ★★★
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
@@ -1414,7 +1415,7 @@ window.addEventListener('pageshow', (event) => {
     }
 });
 
-// 安全装置：万が一エラーで止まっても3秒後に強制的にローダーを消す
+// ★★★ 安全装置：万が一エラーで止まっても3秒後に強制的にローダーを消す ★★★
 setTimeout(() => {
     const loader = document.getElementById('loading-overlay');
     if(loader) loader.style.display = 'none';
