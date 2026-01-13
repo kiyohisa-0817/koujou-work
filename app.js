@@ -7,7 +7,6 @@ window.addEventListener('error', function(e) {
     if (loader) loader.style.display = 'none';
 });
 
-// DOM読み込み完了時点で強制的にローダーを消す予約
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         const loader = document.getElementById('loading-overlay');
@@ -108,14 +107,12 @@ const getCategoryName = (id) => {
     return c ? c.name : id;
 };
 
-// ===============================================
-// Data Handling
-// ===============================================
 let JOBS_DATA = [];
 
 const generateJobs = (count) => {
     const data = [];
     const CITIES = ["新宿区", "横浜市", "名古屋市", "大阪市", "神戸市", "福岡市", "札幌市", "仙台市", "広島市", "京都市"];
+    
     for (let i = 1; i <= count; i++) {
         const pref = PREFS[Math.floor(Math.random() * PREFS.length)];
         const city = CITIES[Math.floor(Math.random() * CITIES.length)];
@@ -211,7 +208,6 @@ const app = {
     },
 
     init: async () => {
-        // ★強制表示: まずローディングを消す
         const loader = document.getElementById('loading-overlay');
         if(loader) loader.style.display = 'none';
 
@@ -240,7 +236,7 @@ const app = {
                 const parsed = JSON.parse(savedState);
                 app.state.filter = { ...app.state.filter, ...(parsed.filter || {}) };
                 app.state.mypageTab = parsed.mypageTab || 'keep';
-            } catch(e){}
+            } catch(e) { console.error("State parse error", e); }
         }
 
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
@@ -309,8 +305,11 @@ const app = {
 
         if (page === 'list') {
             const pref = app.state.filter.pref;
+            const city = app.state.filter.city || [];
+            
             if (pref) {
-                title = `${pref}の工場求人一覧 | 工場ワークNAVi`;
+                title = `${pref}${city.length > 0 ? ' (' + city.join(',') + ')' : ''}の工場求人一覧 | 工場ワークNAVi`;
+                desc = `${pref}の工場・製造業求人を掲載中！${city.length > 0 ? city.join('、') + 'エリアなどの'}条件で絞り込んで検索できます。`;
             } else {
                 title = "求人検索結果 | 工場ワークNAVi";
             }
@@ -318,14 +317,22 @@ const app = {
             const job = JOBS_DATA.find(j => String(j.id) === String(id));
             if (job) {
                 title = `${job.title} | 工場ワークNAVi`;
-                desc = `${job.pref}${job.city}の${getCategoryName(job.category)}求人。給与：${job.salary}。`;
+                desc = `${job.pref}${job.city}の${getCategoryName(job.category)}求人。給与：${job.salary}。${job.desc.substring(0, 80)}...`;
             }
         } else if (page === 'form') {
             title = "応募フォーム | 工場ワークNAVi";
         } else if (page === 'mypage') {
             title = "マイページ | 工場ワークNAVi";
         }
+
         document.title = title;
+        let metaDesc = document.querySelector('meta[name="description"]');
+        if (!metaDesc) {
+            metaDesc = document.createElement('meta');
+            metaDesc.name = "description";
+            document.head.appendChild(metaDesc);
+        }
+        metaDesc.content = desc;
     },
 
     resolveUrlAndRender: () => {
@@ -694,7 +701,6 @@ const app = {
         const { pref, tag, category, sort, type, salaryMin, monthlyMin, annualMin, city } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
             if (pref && j.pref !== pref) return false;
-            // 0件対策：市町村フィルタがある場合だけ絞り込む
             if (city && city.length > 0 && !city.includes(j.city)) return false;
 
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
@@ -744,9 +750,9 @@ const app = {
         
         const cleanId = String(job.id).trim();
         const fallback = getFallbackImage(job);
-        let imagesHtml = `<img src="${R2_DOMAIN}/${cleanId}_1.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.onerror=null;this.src='${fallback}'">`;
-        imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
-        imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start;" onerror="this.style.display='none'">`;
+        let imagesHtml = `<img src="${R2_DOMAIN}/${cleanId}_1.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start; height: 320px; object-fit: cover;" onerror="this.onerror=null;this.src='${fallback}'">`;
+        imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_2.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start; height: 320px; object-fit: cover;" onerror="this.style.display='none'">`;
+        imagesHtml += `<img src="${R2_DOMAIN}/${cleanId}_3.jpg" class="detail-img-full" style="flex:0 0 100%; scroll-snap-align: start; height: 320px; object-fit: cover;" onerror="this.style.display='none'">`;
 
         target.innerHTML = `
             <div style="position:relative;">
