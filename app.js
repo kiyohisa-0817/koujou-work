@@ -1,9 +1,9 @@
 // ===============================================
 // 1. Global Error Handler (安全装置)
 // ===============================================
+// エラーが発生しても、強制的にローディングを消して画面を出す
 window.onerror = function(message, source, lineno, colno, error) {
     console.error("Critical Error:", message);
-    // エラーが起きてもローディングを消す
     const loader = document.getElementById('loading-overlay');
     if(loader) loader.style.display = 'none';
     return false;
@@ -74,6 +74,7 @@ const TAG_GROUPS = {
     "職場環境": ["寮完備", "個室寮", "カップル寮", "食堂あり", "空調完備", "車通勤可", "送迎あり", "駅チカ"],
     "応募条件": ["未経験OK", "経験者優遇", "女性活躍", "男性活躍", "ミドル活躍", "シニア活躍", "学歴不問", "友達と応募OK", "カップル応募OK"]
 };
+
 const REGIONS = [
     { name: "北海道・東北", icon: "❄️", prefs: ["北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県"] },
     { name: "関東", icon: "🗼", prefs: ["東京都", "神奈川県", "千葉県", "埼玉県", "茨城県", "栃木県", "群馬県"] },
@@ -101,7 +102,7 @@ const getCategoryName = (id) => {
     return c ? c.name : id;
 };
 
-// 起動時はまずダミーデータを入れる（これで画面が真っ白になるのを防ぐ）
+// 初期ダミーデータ (画面真っ白防止)
 let JOBS_DATA = generateJobs(20);
 
 function generateJobs(count) {
@@ -117,6 +118,7 @@ function generateJobs(count) {
         const monthly = Math.floor(hourly * 168 / 10000);
         const annual = monthly * 12;
         const type = EMP_TYPES[i % EMP_TYPES.length];
+        
         data.push({
             id: `JOB-${i}`,
             title: `【${pref}】${cat.name}募集！${hourly >= 1600 ? '高時給案件！' : '未経験スタート応援！'}`,
@@ -134,7 +136,7 @@ function generateJobs(count) {
         });
     }
     return data;
-};
+}
 
 const parseCSV = (text) => {
     const arr = [];
@@ -157,10 +159,12 @@ const parseCSV = (text) => {
         const job = {};
         const rawId = arr[i][0] ? arr[i][0].trim() : ''; 
         job.id = rawId;
+
         headers.forEach((h, idx) => { if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; });
         
         const rawSalaryStr = job.salary || '';
         const rawSalaryNum = parseInt(rawSalaryStr.replace(/[^0-9]/g, '')) || 0;
+
         if (rawSalaryStr.indexOf('月給') !== -1 || rawSalaryStr.indexOf('月収') !== -1) {
             let monthlyYen = rawSalaryNum;
             if(monthlyYen < 1000) monthlyYen = monthlyYen * 10000;
@@ -172,10 +176,12 @@ const parseCSV = (text) => {
             job.monthlyVal = Math.floor(job.salaryVal * 168 / 10000);
             job.annualVal = job.monthlyVal * 12;
         }
+
         job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
         job.city = job.city || ''; job.dorm = job.dorm || '';
         job.dorm_desc = job.dorm_desc || ''; job.desc = job.desc || ''; 
+        
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
         if(job.id) jobs.push(job);
     }
@@ -185,11 +191,18 @@ const parseCSV = (text) => {
 // --- App Core ---
 const app = {
     state: {
-        filter: { pref: '', city: [], tag: [], category: [], sort: 'new', type: [], salaryMin: '', monthlyMin: '', annualMin: '' },
+        filter: { 
+            pref: '', city: [], tag: [], category: [], sort: 'new', type: [], salaryMin: '', monthlyMin: '', annualMin: '' 
+        },
         user: null, userProfile: {}, guestKeeps: [], guestApplied: [], mypageTab: 'keep', isModalSearchMode: false, searchLimit: 20
     },
 
     init: async () => {
+        // ★★★ 強制表示：まずローディングを消す ★★★
+        const loader = document.getElementById('loading-overlay');
+        if(loader) loader.style.display = 'none';
+
+        // Viewport Setup
         let viewport = document.querySelector('meta[name="viewport"]');
         if (!viewport) {
             viewport = document.createElement('meta');
@@ -198,6 +211,7 @@ const app = {
         }
         viewport.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
 
+        // Modals Setup
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button id="modal-decide-btn" class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
@@ -209,18 +223,21 @@ const app = {
             `);
         }
 
+        // Restore State
         const savedState = sessionStorage.getItem('fwn_state');
         if (savedState) {
             const parsed = JSON.parse(savedState);
             app.state.filter = { ...app.state.filter, ...(parsed.filter || {}) };
             app.state.mypageTab = parsed.mypageTab || 'keep';
         }
+        
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
         if (savedGuestKeeps) app.state.guestKeeps = JSON.parse(savedGuestKeeps);
         
         const savedGuestApplied = localStorage.getItem('factory_work_navi_guest_applied');
         if (savedGuestApplied) app.state.guestApplied = JSON.parse(savedGuestApplied);
 
+        // URL Params Logic
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
             const p_pref = params.get('pref');
@@ -244,6 +261,7 @@ const app = {
             if (p_annual) app.state.filter.annualMin = p_annual;
         }
 
+        // Auth Logic
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 app.state.user = { uid: user.uid, email: user.email, name: user.displayName || "ゲスト" };
@@ -257,24 +275,22 @@ const app = {
             app.resolveUrlAndRender();
         });
 
-        // ★★★ 改善: まず強制的に画面を表示させる (Render First) ★★★
         app.renderHeader();
-        app.resolveUrlAndRender();
-        const loader = document.getElementById('loading-overlay');
-        if(loader) loader.style.display = 'none'; // 先に消す
+        app.resolveUrlAndRender(); // Render initial dummy data immediately
 
-        // ★★★ その後でデータを取得しに行く (Fetch Later) ★★★
-        try {
-            if (GOOGLE_SHEET_CSV_URL) {
+        // Data Fetch (Async)
+        if (GOOGLE_SHEET_CSV_URL) {
+            try {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
                 if (response.ok) {
                     const text = await response.text();
                     JOBS_DATA = parseCSV(text);
-                    app.resolveUrlAndRender(); // データ取得後に再描画
+                    app.resolveUrlAndRender(); // Re-render with real data
                 }
+            } catch (e) {
+                console.error("Data fetch error", e);
+                // No action needed, dummy data is already there
             }
-        } catch (e) {
-            console.warn("Using Dummy Data due to load error", e);
         }
     },
 
@@ -1223,7 +1239,6 @@ const app = {
     },
 
     selectCities: (pref, cities) => {
-        // ★★★ 改善: 他の条件をリセットして、新しいエリア条件だけで検索する ★★★
         app.state.filter.pref = pref;
         app.state.filter.city = cities; 
         
@@ -1247,8 +1262,6 @@ const app = {
         }
 
         const params = new URLSearchParams(window.location.search);
-        // トップページからなら、その場では飛ばずにstate更新だけ。
-        // リストページなら、即座に反映して再描画
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
         }
@@ -1379,14 +1392,5 @@ window.addEventListener('pageshow', (event) => {
         app.resolveUrlAndRender();
     }
 });
-
-// ★★★ 安全装置：万が一エラーで止まっても2秒後に強制的にローダーを消す ★★★
-setTimeout(() => {
-    const loader = document.getElementById('loading-overlay');
-    if(loader && loader.style.display !== 'none') {
-        console.warn("Force hiding loader");
-        loader.style.display = 'none';
-    }
-}, 2000);
 
 document.addEventListener('DOMContentLoaded', app.init);
