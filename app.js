@@ -179,7 +179,7 @@ const parseCSV = (text) => {
             if(monthlyYen < 1000) monthlyYen = monthlyYen * 10000;
             job.monthlyVal = Math.floor(monthlyYen / 10000); 
             job.salaryVal = Math.floor(monthlyYen / 168);    
-            job.annualVal = job.monthlyVal * 12;             
+            job.annualVal = job.monthlyVal * 12;              
         } else {
             job.salaryVal = rawSalaryNum || 1000;
             job.monthlyVal = Math.floor(job.salaryVal * 168 / 10000);
@@ -293,28 +293,26 @@ const app = {
 
         app.renderHeader();
 
-        // ★★★ 強力なデータ読み込み & 安全装置 ★★★
-        try {
-            if (GOOGLE_SHEET_CSV_URL) {
+        if (GOOGLE_SHEET_CSV_URL) {
+            try {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
-                if (response.ok) {
-                    const text = await response.text();
-                    JOBS_DATA = parseCSV(text);
-                } else {
-                    throw new Error('CSV load failed');
-                }
+                if (!response.ok) throw new Error('Network error');
+                const text = await response.text();
+                JOBS_DATA = parseCSV(text);
+                app.resolveUrlAndRender();
+            } catch (e) {
+                console.error("CSV Error:", e);
+                JOBS_DATA = generateJobs(20);
+                app.resolveUrlAndRender();
             }
-        } catch (e) {
-            console.error("Data Load Error:", e);
-            JOBS_DATA = generateJobs(20); // フォールバック
-        } finally {
-            // ★★★ どんな状況でも必ずローディングを消す ★★★
-            const loader = document.getElementById('loading-overlay');
-            if(loader) loader.style.display = 'none';
-            app.resolveUrlAndRender();
         }
+        document.getElementById('loading-overlay').style.display = 'none';
+
+        const page = params.get('page');
+        app.resolveUrlAndRender();
     },
 
+    // ★★★ SEO用メタデータ更新関数 (機能強化) ★★★
     updateSeo: () => {
         const params = new URLSearchParams(window.location.search);
         const page = params.get('page');
@@ -346,6 +344,7 @@ const app = {
 
         document.title = title;
         
+        // メタディスクリプションの更新
         let metaDesc = document.querySelector('meta[name="description"]');
         if (!metaDesc) {
             metaDesc = document.createElement('meta');
@@ -360,7 +359,7 @@ const app = {
         const id = params.get('id');
         const page = params.get('page');
 
-        app.updateSeo();
+        app.updateSeo(); // タイトルと説明文を更新
 
         const container = document.getElementById('main-content');
         if (!container) return;
@@ -627,7 +626,7 @@ const app = {
                     </div>
 
                     <div class="job-info-row" style="font-size:13px; font-weight:bold; color:#333; margin-bottom:2px;">
-                        <span>🏭</span> ${getCategoryName(job.category)}   <span>💼</span> ${job.type}
+                        <span>🏭</span> ${getCategoryName(job.category)}    <span>💼</span> ${job.type}
                     </div>
                     
                     <div style="font-size:12px; color:#666; margin:0 0 8px; line-height:1.4;">
@@ -672,7 +671,12 @@ const app = {
     },
 
     handleTopSearch: () => {
-        // ★★★ 修正: 検索ボタン押下時はstateの値をそのまま使う ★★★
+        const prefDisplay = document.getElementById('top-pref-display');
+        if (prefDisplay && prefDisplay.innerText.includes('勤務地')) {
+             app.state.filter.pref = '';
+             app.state.filter.city = [];
+        }
+        
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
@@ -792,7 +796,7 @@ const app = {
                             <span class="summary-icon">📍</span>
                             <div style="flex:1">
                                 <div style="font-weight:bold; font-size:1.1em; margin-bottom:4px; line-height:1.4;">${job.pref}${job.city ? ' ' + job.city : ''}</div>
-                                <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
+                                <a href="http://maps.google.com/maps?q=${encodeURIComponent(job.pref + (job.city || ''))}" target="_blank" style="display:inline-block; font-size:12px; color:#0056b3; text-decoration:none; background:#e3f2fd; padding:2px 8px; border-radius:4px;">📍 Googleマップで見る</a>
                             </div>
                         </div>
                         <div class="summary-row"><span class="summary-icon">🏭</span><span class="summary-val">${job.type}</span></div>
@@ -1368,6 +1372,7 @@ const app = {
             </div>
         `;
 
+        // ★★★ 給与選択ロジック（どれか1つを選択したら他をクリア） ★★★
         const salaryHtml = `
             <div class="cond-section">
                 <div class="cond-head"><span class="cond-icon">💰</span>給与・収入（下限）</div>
@@ -1414,11 +1419,5 @@ window.addEventListener('pageshow', (event) => {
         app.resolveUrlAndRender();
     }
 });
-
-// ★★★ 安全装置：万が一エラーで止まっても3秒後に強制的にローダーを消す ★★★
-setTimeout(() => {
-    const loader = document.getElementById('loading-overlay');
-    if(loader) loader.style.display = 'none';
-}, 3000);
 
 document.addEventListener('DOMContentLoaded', app.init);
