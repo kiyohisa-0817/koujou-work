@@ -312,16 +312,20 @@ const app = {
         app.resolveUrlAndRender();
     },
 
-    updateTitle: () => {
+    updateSeo: () => {
         const params = new URLSearchParams(window.location.search);
         const page = params.get('page');
         const id = params.get('id');
         let title = "工場ワークNAVi | 工場・製造業の求人情報";
+        let desc = "工場・製造業の求人なら工場ワークNAVi。高収入、寮完備、未経験歓迎など、あなたにぴったりの求人が見つかります。";
 
         if (page === 'list') {
             const pref = app.state.filter.pref;
+            const city = app.state.filter.city || [];
+            
             if (pref) {
-                title = `${pref}の求人一覧 | 工場ワークNAVi`;
+                title = `${pref}${city.length > 0 ? ' (' + city.join(',') + ')' : ''}の工場求人一覧 | 工場ワークNAVi`;
+                desc = `${pref}の工場・製造業求人を掲載中！${city.length > 0 ? city.join('、') + 'エリアなどの'}条件で絞り込んで検索できます。`;
             } else {
                 title = "求人検索結果 | 工場ワークNAVi";
             }
@@ -329,6 +333,7 @@ const app = {
             const job = JOBS_DATA.find(j => String(j.id) === String(id));
             if (job) {
                 title = `${job.title} | 工場ワークNAVi`;
+                desc = `${job.pref}${job.city}の${getCategoryName(job.category)}求人。給与：${job.salary}。${job.desc.substring(0, 80)}...`;
             }
         } else if (page === 'form') {
             title = "応募フォーム | 工場ワークNAVi";
@@ -337,6 +342,14 @@ const app = {
         }
 
         document.title = title;
+        
+        let metaDesc = document.querySelector('meta[name="description"]');
+        if (!metaDesc) {
+            metaDesc = document.createElement('meta');
+            metaDesc.name = "description";
+            document.head.appendChild(metaDesc);
+        }
+        metaDesc.content = desc;
     },
 
     resolveUrlAndRender: () => {
@@ -344,7 +357,7 @@ const app = {
         const id = params.get('id');
         const page = params.get('page');
 
-        app.updateTitle();
+        app.updateSeo();
 
         const container = document.getElementById('main-content');
         if (!container) return;
@@ -656,12 +669,11 @@ const app = {
     },
 
     handleTopSearch: () => {
-        const prefText = document.getElementById('top-pref-display').innerText;
-        const pref = prefText.includes('勤務地') ? '' : prefText.replace('▼','').replace('変更する >','').replace('📍','').trim();
+        // prefはselectPrefなどで既にstateに入っている正しい値を使う（DOMから読み取ると「(3エリア)」などが混入するため）
         const category = Array.from(document.querySelectorAll('input[name="top-cat"]:checked')).map(c => c.value);
         const tag = Array.from(document.querySelectorAll('input[name="top-tag"]:checked')).map(t => t.value);
         const type = Array.from(document.querySelectorAll('input[name="top-type"]:checked')).map(t => t.value);
-        app.state.filter.pref = pref;
+        
         app.state.filter.category = category;
         app.state.filter.tag = tag;
         app.state.filter.type = type;
