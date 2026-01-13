@@ -1,15 +1,4 @@
 // ===============================================
-// 1. Global Error Handler (安全装置)
-// ===============================================
-// エラーが発生しても、強制的にローディングを消して画面を出す
-window.onerror = function(message, source, lineno, colno, error) {
-    console.error("Critical Error:", message);
-    const loader = document.getElementById('loading-overlay');
-    if(loader) loader.style.display = 'none';
-    return false;
-};
-
-// ===============================================
 // Firebase Integration
 // ===============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -44,6 +33,7 @@ const firebaseConfig = {
     appId: "1:789923892236:web:4a6586c835126cd3667229"
 };
 
+// Initialize Firebase
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
@@ -102,10 +92,12 @@ const getCategoryName = (id) => {
     return c ? c.name : id;
 };
 
-// 初期ダミーデータ (画面真っ白防止)
-let JOBS_DATA = generateJobs(20);
+// ===============================================
+// Data Handling
+// ===============================================
+let JOBS_DATA = [];
 
-function generateJobs(count) {
+const generateJobs = (count) => {
     const data = [];
     const CITIES = ["新宿区", "横浜市", "名古屋市", "大阪市", "神戸市", "福岡市", "札幌市", "仙台市", "広島市", "京都市"];
     for (let i = 1; i <= count; i++) {
@@ -136,7 +128,10 @@ function generateJobs(count) {
         });
     }
     return data;
-}
+};
+
+// 初期表示用ダミーデータ
+JOBS_DATA = generateJobs(20);
 
 const parseCSV = (text) => {
     const arr = [];
@@ -160,7 +155,9 @@ const parseCSV = (text) => {
         const rawId = arr[i][0] ? arr[i][0].trim() : ''; 
         job.id = rawId;
 
-        headers.forEach((h, idx) => { if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; });
+        headers.forEach((h, idx) => { 
+            if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; 
+        });
         
         const rawSalaryStr = job.salary || '';
         const rawSalaryNum = parseInt(rawSalaryStr.replace(/[^0-9]/g, '')) || 0;
@@ -179,30 +176,48 @@ const parseCSV = (text) => {
 
         job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
-        job.city = job.city || ''; job.dorm = job.dorm || '';
-        job.dorm_desc = job.dorm_desc || ''; job.desc = job.desc || ''; 
+        job.city = job.city || '';
+        job.dorm = job.dorm || '';
+        job.dorm_desc = job.dorm_desc || '';
+        job.desc = job.desc || ''; 
         
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
+        
         if(job.id) jobs.push(job);
     }
     return jobs;
 };
 
-// --- App Core ---
+// ===============================================
+// App Core
+// ===============================================
 const app = {
     state: {
         filter: { 
-            pref: '', city: [], tag: [], category: [], sort: 'new', type: [], salaryMin: '', monthlyMin: '', annualMin: '' 
+            pref: '', 
+            city: [], 
+            tag: [], 
+            category: [], 
+            sort: 'new', 
+            type: [],
+            salaryMin: '', 
+            monthlyMin: '', 
+            annualMin: ''   
         },
-        user: null, userProfile: {}, guestKeeps: [], guestApplied: [], mypageTab: 'keep', isModalSearchMode: false, searchLimit: 20
+        user: null,
+        userProfile: {},
+        guestKeeps: [],
+        guestApplied: [],
+        mypageTab: 'keep',
+        isModalSearchMode: false,
+        searchLimit: 20
     },
 
     init: async () => {
-        // ★★★ 強制表示：まずローディングを消す ★★★
+        // ★★★ 修正: 確実にローディングを消す ★★★
         const loader = document.getElementById('loading-overlay');
         if(loader) loader.style.display = 'none';
 
-        // Viewport Setup
         let viewport = document.querySelector('meta[name="viewport"]');
         if (!viewport) {
             viewport = document.createElement('meta');
@@ -211,7 +226,6 @@ const app = {
         }
         viewport.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
 
-        // Modals Setup
         if(!document.getElementById('condition-modal')) {
             document.body.insertAdjacentHTML('beforeend', `
                 <div id="condition-modal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>詳細条件を設定</span><button class="modal-close" onclick="app.closeConditionModal()">×</button></div><div id="modal-active-chips" class="modal-chip-bar"></div><div class="modal-body" id="condition-modal-body"></div><div class="modal-footer"><button id="modal-decide-btn" class="btn btn-primary" onclick="app.closeConditionModal()">この条件で決定</button></div></div></div>
@@ -223,21 +237,25 @@ const app = {
             `);
         }
 
-        // Restore State
         const savedState = sessionStorage.getItem('fwn_state');
         if (savedState) {
-            const parsed = JSON.parse(savedState);
-            app.state.filter = { ...app.state.filter, ...(parsed.filter || {}) };
-            app.state.mypageTab = parsed.mypageTab || 'keep';
+            try {
+                const parsed = JSON.parse(savedState);
+                app.state.filter = { ...app.state.filter, ...(parsed.filter || {}) };
+                app.state.mypageTab = parsed.mypageTab || 'keep';
+            } catch(e) { console.error("State parse error", e); }
+        }
+
+        const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
+        if (savedGuestKeeps) {
+             try { app.state.guestKeeps = JSON.parse(savedGuestKeeps); } catch(e){}
         }
         
-        const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
-        if (savedGuestKeeps) app.state.guestKeeps = JSON.parse(savedGuestKeeps);
-        
         const savedGuestApplied = localStorage.getItem('factory_work_navi_guest_applied');
-        if (savedGuestApplied) app.state.guestApplied = JSON.parse(savedGuestApplied);
+        if (savedGuestApplied) {
+            try { app.state.guestApplied = JSON.parse(savedGuestApplied); } catch(e){}
+        }
 
-        // URL Params Logic
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
             const p_pref = params.get('pref');
@@ -261,7 +279,6 @@ const app = {
             if (p_annual) app.state.filter.annualMin = p_annual;
         }
 
-        // Auth Logic
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 app.state.user = { uid: user.uid, email: user.email, name: user.displayName || "ゲスト" };
@@ -275,21 +292,22 @@ const app = {
             app.resolveUrlAndRender();
         });
 
+        // ★★★ 初期描画 (最優先) ★★★
         app.renderHeader();
-        app.resolveUrlAndRender(); // Render initial dummy data immediately
+        app.resolveUrlAndRender();
 
-        // Data Fetch (Async)
+        // ★★★ データ読み込み (後から反映) ★★★
         if (GOOGLE_SHEET_CSV_URL) {
             try {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
                 if (response.ok) {
                     const text = await response.text();
                     JOBS_DATA = parseCSV(text);
-                    app.resolveUrlAndRender(); // Re-render with real data
+                    app.resolveUrlAndRender();
                 }
             } catch (e) {
-                console.error("Data fetch error", e);
-                // No action needed, dummy data is already there
+                console.error("CSV Load Error:", e);
+                // ダミーデータがあるので何もしない
             }
         }
     },
@@ -324,7 +342,6 @@ const app = {
         }
 
         document.title = title;
-        
         let metaDesc = document.querySelector('meta[name="description"]');
         if (!metaDesc) {
             metaDesc = document.createElement('meta');
@@ -434,18 +451,20 @@ const app = {
     restoreFormData: () => {
         const json = sessionStorage.getItem('temp_form_data');
         if (!json) return;
-        const data = JSON.parse(json);
-        Object.keys(data).forEach(key => {
-            const el = document.getElementById(key);
-            if (el) {
-                el.value = data[key];
-            } else {
-                const radios = document.getElementsByName(key);
-                if (radios.length > 0) {
-                    radios.forEach(r => { if (r.value === data[key]) r.checked = true; });
+        try {
+            const data = JSON.parse(json);
+            Object.keys(data).forEach(key => {
+                const el = document.getElementById(key);
+                if (el) {
+                    el.value = data[key];
+                } else {
+                    const radios = document.getElementsByName(key);
+                    if (radios.length > 0) {
+                        radios.forEach(r => { if (r.value === data[key]) r.checked = true; });
+                    }
                 }
-            }
-        });
+            });
+        } catch(e){}
     },
 
     syncUserKeeps: (uid) => {
@@ -698,6 +717,7 @@ const app = {
         const { pref, tag, category, sort, type, salaryMin, monthlyMin, annualMin, city } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
             if (pref && j.pref !== pref) return false;
+            // ★★★ 0件バグ対策: 市区町村フィルタがある場合だけ絞り込む ★★★
             if (city && city.length > 0 && !city.includes(j.city)) return false;
 
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
@@ -1239,6 +1259,7 @@ const app = {
     },
 
     selectCities: (pref, cities) => {
+        // ★★★ 改善: 他の条件をリセットして、新しいエリア条件だけで検索する ★★★
         app.state.filter.pref = pref;
         app.state.filter.city = cities; 
         
@@ -1262,6 +1283,8 @@ const app = {
         }
 
         const params = new URLSearchParams(window.location.search);
+        // トップページからなら、その場では飛ばずにstate更新だけ。
+        // リストページなら、即座に反映して再描画
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
         }
