@@ -1,20 +1,4 @@
 // ===============================================
-// 0. 緊急安全装置 (何があってもローディングを消す)
-// ===============================================
-window.addEventListener('error', function(e) {
-    console.error("Global Error Caught:", e.message);
-    const loader = document.getElementById('loading-overlay');
-    if (loader) loader.style.display = 'none';
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const loader = document.getElementById('loading-overlay');
-        if (loader) loader.style.display = 'none';
-    }, 2000);
-});
-
-// ===============================================
 // Firebase Integration
 // ===============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -49,6 +33,7 @@ const firebaseConfig = {
     appId: "1:789923892236:web:4a6586c835126cd3667229"
 };
 
+// Initialize Firebase
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
@@ -79,6 +64,7 @@ const TAG_GROUPS = {
     "職場環境": ["寮完備", "個室寮", "カップル寮", "食堂あり", "空調完備", "車通勤可", "送迎あり", "駅チカ"],
     "応募条件": ["未経験OK", "経験者優遇", "女性活躍", "男性活躍", "ミドル活躍", "シニア活躍", "学歴不問", "友達と応募OK", "カップル応募OK"]
 };
+const ALL_TAGS_FLAT = Object.values(TAG_GROUPS).flat();
 
 const REGIONS = [
     { name: "北海道・東北", icon: "❄️", prefs: ["北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県"] },
@@ -112,7 +98,6 @@ let JOBS_DATA = [];
 const generateJobs = (count) => {
     const data = [];
     const CITIES = ["新宿区", "横浜市", "名古屋市", "大阪市", "神戸市", "福岡市", "札幌市", "仙台市", "広島市", "京都市"];
-    
     for (let i = 1; i <= count; i++) {
         const pref = PREFS[Math.floor(Math.random() * PREFS.length)];
         const city = CITIES[Math.floor(Math.random() * CITIES.length)];
@@ -143,7 +128,7 @@ const generateJobs = (count) => {
     return data;
 };
 
-// 初期表示用ダミーデータ（真っ白防止）
+// ★初期ダミーデータ投入
 JOBS_DATA = generateJobs(20);
 
 const parseCSV = (text) => {
@@ -208,6 +193,7 @@ const app = {
     },
 
     init: async () => {
+        // ★★★ 修正ポイント：ローディングを即消去して画面を出す ★★★
         const loader = document.getElementById('loading-overlay');
         if(loader) loader.style.display = 'none';
 
@@ -236,7 +222,7 @@ const app = {
                 const parsed = JSON.parse(savedState);
                 app.state.filter = { ...app.state.filter, ...(parsed.filter || {}) };
                 app.state.mypageTab = parsed.mypageTab || 'keep';
-            } catch(e) { console.error("State parse error", e); }
+            } catch(e){}
         }
 
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
@@ -281,6 +267,7 @@ const app = {
             app.resolveUrlAndRender();
         });
 
+        // ★初期表示を実行（ダミーデータでも表示する）
         app.renderHeader();
         app.resolveUrlAndRender();
 
@@ -324,7 +311,6 @@ const app = {
         } else if (page === 'mypage') {
             title = "マイページ | 工場ワークNAVi";
         }
-
         document.title = title;
         let metaDesc = document.querySelector('meta[name="description"]');
         if (!metaDesc) {
