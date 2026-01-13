@@ -306,7 +306,10 @@ const app = {
                 app.resolveUrlAndRender();
             }
         }
-        document.getElementById('loading-overlay').style.display = 'none';
+        
+        // ★★★ 安全装置：ローディングが終わらない場合、強制的に解除 ★★★
+        const loader = document.getElementById('loading-overlay');
+        if(loader) loader.style.display = 'none';
 
         const page = params.get('page');
         app.resolveUrlAndRender();
@@ -1411,5 +1414,11 @@ window.addEventListener('pageshow', (event) => {
         app.resolveUrlAndRender();
     }
 });
+
+// 安全装置：万が一エラーで止まっても3秒後に強制的にローダーを消す
+setTimeout(() => {
+    const loader = document.getElementById('loading-overlay');
+    if(loader) loader.style.display = 'none';
+}, 3000);
 
 document.addEventListener('DOMContentLoaded', app.init);
