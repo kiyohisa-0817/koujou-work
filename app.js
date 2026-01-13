@@ -1,4 +1,21 @@
 // ===============================================
+// 0. 緊急安全装置 (何があってもローディングを消す)
+// ===============================================
+window.addEventListener('error', function(e) {
+    console.error("Global Error Caught:", e.message);
+    const loader = document.getElementById('loading-overlay');
+    if (loader) loader.style.display = 'none';
+});
+
+// DOM読み込み完了時点で強制的にローダーを消す予約
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const loader = document.getElementById('loading-overlay');
+        if (loader) loader.style.display = 'none';
+    }, 2000);
+});
+
+// ===============================================
 // Firebase Integration
 // ===============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -33,7 +50,6 @@ const firebaseConfig = {
     appId: "1:789923892236:web:4a6586c835126cd3667229"
 };
 
-// Initialize Firebase
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
 const db = getFirestore(fbApp);
@@ -130,7 +146,7 @@ const generateJobs = (count) => {
     return data;
 };
 
-// 初期表示用ダミーデータ
+// 初期表示用ダミーデータ（真っ白防止）
 JOBS_DATA = generateJobs(20);
 
 const parseCSV = (text) => {
@@ -155,9 +171,7 @@ const parseCSV = (text) => {
         const rawId = arr[i][0] ? arr[i][0].trim() : ''; 
         job.id = rawId;
 
-        headers.forEach((h, idx) => { 
-            if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; 
-        });
+        headers.forEach((h, idx) => { if(idx > 0) job[h] = arr[i][idx] ? arr[i][idx].trim() : ''; });
         
         const rawSalaryStr = job.salary || '';
         const rawSalaryNum = parseInt(rawSalaryStr.replace(/[^0-9]/g, '')) || 0;
@@ -176,13 +190,10 @@ const parseCSV = (text) => {
 
         job.idNum = parseInt(job.id.replace(/[^0-9]/g, '')) || 0;
         job.isNew = job.isNew === 'TRUE' || job.isNew === 'true';
-        job.city = job.city || '';
-        job.dorm = job.dorm || '';
-        job.dorm_desc = job.dorm_desc || '';
-        job.desc = job.desc || ''; 
+        job.city = job.city || ''; job.dorm = job.dorm || '';
+        job.dorm_desc = job.dorm_desc || ''; job.desc = job.desc || ''; 
         
         if(job.tags) job.tags = job.tags.split(/[\s|]+/).filter(t => t); else job.tags = [];
-        
         if(job.id) jobs.push(job);
     }
     return jobs;
@@ -194,27 +205,13 @@ const parseCSV = (text) => {
 const app = {
     state: {
         filter: { 
-            pref: '', 
-            city: [], 
-            tag: [], 
-            category: [], 
-            sort: 'new', 
-            type: [],
-            salaryMin: '', 
-            monthlyMin: '', 
-            annualMin: ''   
+            pref: '', city: [], tag: [], category: [], sort: 'new', type: [], salaryMin: '', monthlyMin: '', annualMin: '' 
         },
-        user: null,
-        userProfile: {},
-        guestKeeps: [],
-        guestApplied: [],
-        mypageTab: 'keep',
-        isModalSearchMode: false,
-        searchLimit: 20
+        user: null, userProfile: {}, guestKeeps: [], guestApplied: [], mypageTab: 'keep', isModalSearchMode: false, searchLimit: 20
     },
 
     init: async () => {
-        // ★★★ 修正: 確実にローディングを消す ★★★
+        // ★強制表示: まずローディングを消す
         const loader = document.getElementById('loading-overlay');
         if(loader) loader.style.display = 'none';
 
@@ -243,18 +240,14 @@ const app = {
                 const parsed = JSON.parse(savedState);
                 app.state.filter = { ...app.state.filter, ...(parsed.filter || {}) };
                 app.state.mypageTab = parsed.mypageTab || 'keep';
-            } catch(e) { console.error("State parse error", e); }
+            } catch(e){}
         }
 
         const savedGuestKeeps = localStorage.getItem('factory_work_navi_guest_keeps');
-        if (savedGuestKeeps) {
-             try { app.state.guestKeeps = JSON.parse(savedGuestKeeps); } catch(e){}
-        }
+        if (savedGuestKeeps) { try { app.state.guestKeeps = JSON.parse(savedGuestKeeps); } catch(e){} }
         
         const savedGuestApplied = localStorage.getItem('factory_work_navi_guest_applied');
-        if (savedGuestApplied) {
-            try { app.state.guestApplied = JSON.parse(savedGuestApplied); } catch(e){}
-        }
+        if (savedGuestApplied) { try { app.state.guestApplied = JSON.parse(savedGuestApplied); } catch(e){} }
 
         const params = new URLSearchParams(window.location.search);
         if (params.get('page') === 'list') {
@@ -292,11 +285,9 @@ const app = {
             app.resolveUrlAndRender();
         });
 
-        // ★★★ 初期描画 (最優先) ★★★
         app.renderHeader();
         app.resolveUrlAndRender();
 
-        // ★★★ データ読み込み (後から反映) ★★★
         if (GOOGLE_SHEET_CSV_URL) {
             try {
                 const response = await fetch(GOOGLE_SHEET_CSV_URL);
@@ -305,10 +296,7 @@ const app = {
                     JOBS_DATA = parseCSV(text);
                     app.resolveUrlAndRender();
                 }
-            } catch (e) {
-                console.error("CSV Load Error:", e);
-                // ダミーデータがあるので何もしない
-            }
+            } catch (e) { console.error("CSV Load Error:", e); }
         }
     },
 
@@ -321,11 +309,8 @@ const app = {
 
         if (page === 'list') {
             const pref = app.state.filter.pref;
-            const city = app.state.filter.city || [];
-            
             if (pref) {
-                title = `${pref}${city.length > 0 ? ' (' + city.join(',') + ')' : ''}の工場求人一覧 | 工場ワークNAVi`;
-                desc = `${pref}の工場・製造業求人を掲載中！${city.length > 0 ? city.join('、') + 'エリアなどの'}条件で絞り込んで検索できます。`;
+                title = `${pref}の工場求人一覧 | 工場ワークNAVi`;
             } else {
                 title = "求人検索結果 | 工場ワークNAVi";
             }
@@ -333,22 +318,14 @@ const app = {
             const job = JOBS_DATA.find(j => String(j.id) === String(id));
             if (job) {
                 title = `${job.title} | 工場ワークNAVi`;
-                desc = `${job.pref}${job.city}の${getCategoryName(job.category)}求人。給与：${job.salary}。${job.desc.substring(0, 80)}...`;
+                desc = `${job.pref}${job.city}の${getCategoryName(job.category)}求人。給与：${job.salary}。`;
             }
         } else if (page === 'form') {
             title = "応募フォーム | 工場ワークNAVi";
         } else if (page === 'mypage') {
             title = "マイページ | 工場ワークNAVi";
         }
-
         document.title = title;
-        let metaDesc = document.querySelector('meta[name="description"]');
-        if (!metaDesc) {
-            metaDesc = document.createElement('meta');
-            metaDesc.name = "description";
-            document.head.appendChild(metaDesc);
-        }
-        metaDesc.content = desc;
     },
 
     resolveUrlAndRender: () => {
@@ -717,7 +694,7 @@ const app = {
         const { pref, tag, category, sort, type, salaryMin, monthlyMin, annualMin, city } = app.state.filter;
         let res = JOBS_DATA.filter(j => {
             if (pref && j.pref !== pref) return false;
-            // ★★★ 0件バグ対策: 市区町村フィルタがある場合だけ絞り込む ★★★
+            // 0件対策：市町村フィルタがある場合だけ絞り込む
             if (city && city.length > 0 && !city.includes(j.city)) return false;
 
             if (tag && tag.length > 0 && !tag.every(t => j.tags.includes(t))) return false;
@@ -1259,7 +1236,6 @@ const app = {
     },
 
     selectCities: (pref, cities) => {
-        // ★★★ 改善: 他の条件をリセットして、新しいエリア条件だけで検索する ★★★
         app.state.filter.pref = pref;
         app.state.filter.city = cities; 
         
@@ -1283,8 +1259,6 @@ const app = {
         }
 
         const params = new URLSearchParams(window.location.search);
-        // トップページからなら、その場では飛ばずにstate更新だけ。
-        // リストページなら、即座に反映して再描画
         if (params.get('page') === 'list') {
              app.resolveUrlAndRender();
         }
